@@ -155,7 +155,7 @@ class OwlPredictor(torch.nn.Module):
         self.image_size = _owl_get_image_size(model_name)
         self.device = device
         self.model = OwlViTForObjectDetection.from_pretrained("/workspace/resources/owlvit-base-patch32", local_files_only=True).to(self.device).eval()
-        self.processor = OwlViTProcessor..from_pretrained("/workspace/resources/owlvit-base-patch32", local_files_only=True)
+        self.processor = OwlViTProcessor.from_pretrained("/workspace/resources/owlvit-base-patch32", local_files_only=True)
         self.patch_size = _owl_get_patch_size(model_name)
         self.num_patches_per_side = self.image_size // self.patch_size
         self.box_bias = _owl_compute_box_bias(self.num_patches_per_side).to(self.device)
