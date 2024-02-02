@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/l4t-jetpack:r35.3.1
+FROM dustynv/nanoowl:r35.3.1
 
 # 0. System Requirements
 ENV DEBIAN_FRONTEND=noninteractive
