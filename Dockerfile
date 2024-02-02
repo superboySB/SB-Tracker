@@ -40,16 +40,16 @@ RUN pip3 uninstall opencv
 #     pip3 install -r requirements.txt 
 
 # 4. Prepare the alternative resources
-# RUN mkdir /workspace/resources && cd /workspace/resources && \
-#     gdown https://drive.google.com/uc?id=14-SsvoaTl-esC3JOzomHDnI9OGgdO2OR && \
-#     wget --quiet --show-progress --progress=bar:force:noscroll --no-check-certificate \
-# 	 https://nvidia.box.com/shared/static/ho09o7ohgp7lsqe0tcxqu5gs2ddojbis.onnx \
-# 	 -O /workspace/resources/mobile_sam_mask_decoder.onnx
+RUN mkdir /workspace/resources && cd /workspace/resources && \
+    gdown https://drive.google.com/uc?id=14-SsvoaTl-esC3JOzomHDnI9OGgdO2OR && \
+    wget --quiet --show-progress --progress=bar:force:noscroll --no-check-certificate \
+	 https://nvidia.box.com/shared/static/ho09o7ohgp7lsqe0tcxqu5gs2ddojbis.onnx \
+	 -O /workspace/resources/mobile_sam_mask_decoder.onnx
 RUN git clone https://huggingface.co/google/owlvit-base-patch32
 RUN git clone https://huggingface.co/google/owlv2-base-patch16-ensemble
 
 
-WORKDIR /worksapce
+WORKDIR /workspace
 
 
 
