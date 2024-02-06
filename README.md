@@ -9,8 +9,6 @@ docker build -f docker/deploy.dockerfile -t sbt_image:r35.3.1 .
 docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DISPLAY --runtime=nvidia --device /dev/video0:/dev/video0 --device /dev/snd --device /dev/bus/usb --network=host --ipc host --name=sbtracker sbt_image:r35.3.1 /bin/bash
 
 docker exec -it sbtracker /bin/bash
-
-cd /workspace && git clone https://github.com/superboySB/SB-Tracker && cd SB-Tracker
 ```
 ### 开放环境检测功能部署
 这一步一定要在台式机上(可以考虑使用`train.dockerfile`在run完的容器直接拿)，我们需要在docker中默认准备好的一个训练好的自带pytorch模型作为范例,然后添加bbox decoder、NMS后转为ONNX模型。
@@ -69,5 +67,7 @@ python3 examples/basic_usage.py \
 ## 运行代码
 检验点击跟踪功能
 ```sh
+cd /workspace && git clone https://github.com/superboySB/SB-Tracker && cd SB-Tracker
+
 python3 click_and_track.py
 ```
