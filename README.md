@@ -13,36 +13,19 @@ docker exec -it sbtracker /bin/bash
 cd /workspace && git clone https://github.com/superboySB/SB-Tracker && cd SB-Tracker
 ```
 ### 开放环境检测功能部署
-先自己准备一个训练好的pytorch模型（这里默认先用自带的）,然后添加bbox decoder、NMS后转为ONNX模型。
+在docker中默认准备好了一个训练好的自带pytorch模型,然后添加bbox decoder、NMS后转为ONNX模型，然后使用TensorRT的python api来适配几个yolo模型
 ```sh
 cd /workspace/YOLOv8-TensorRT
-
-python3 export-det.py \
-    --weights yolov8s.pt \
-    --iou-thres 0.65 \
-    --conf-thres 0.25 \
-    --topk 100 \
-    --opset 11 \
-    --sim \
-    --input-shape 1 3 640 640 \
-    --device cuda:0
+/usr/src/tensorrt/bin/trtexec --onnx=yolov8m.onnx --saveEngine=yolov8m.engine --fp16 && \
+/usr/src/tensorrt/bin/trtexec --onnx=yolov8m-oiv7.onnx --saveEngine=yolov8m-oiv7.engine --fp16 && \
+/usr/src/tensorrt/bin/trtexec --onnx=yolov8m-seg.onnx --saveEngine=yolov8s-seg.engine --fp16 && \
+/usr/src/tensorrt/bin/trtexec --onnx=yolov8m-pose.onnx --saveEngine=yolov8m-pose.engine --fp16
 ```
-使用TensorRT的python api来适配yolo模型
-```sh
-python3 build.py \
-    --weights yolov8s.onnx \
-    --iou-thres 0.65 \
-    --conf-thres 0.25 \
-    --topk 100 \
-    --fp16  \
-    --device cuda:0
-```
-测试检测功能是否正常
+测试yolo检测图片功能是否正常
 ```sh
 python3 infer-det.py \
-    --engine yolov8s.engine \
+    --engine yolov8m.engine \
     --imgs data \
-    --show \
     --out-dir outputs \
     --device cuda:0
 ```
@@ -78,7 +61,5 @@ python3 examples/basic_usage.py \
 ## 运行代码
 检验点击跟踪功能
 ```sh
-python3 examples/demo_click_segment_track.py \
-    --image_encoder="data/resnet18_image_encoder.engine" \
-    --mask_decoder="data/mobile_sam_mask_decoder.engine"
+python3 click_and_track.py
 ```

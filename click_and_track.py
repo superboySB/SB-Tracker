@@ -18,7 +18,6 @@ import numpy as np
 import argparse
 from nanosam.utils.predictor import Predictor
 from sam_tracker import Tracker
-import vpi
 
 
 def init_track(event,x,y,flags,param):
@@ -55,8 +54,8 @@ def customUpdate(inBoxes, inPreds, outBoxes, outEstim):
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--image_encoder", type=str, default="data/resnet18_image_encoder.engine")
-    parser.add_argument("--mask_decoder", type=str, default="data/mobile_sam_mask_decoder.engine")
+    parser.add_argument("--image_encoder", type=str, default="/opt/nanosam/data/resnet18_image_encoder.engine")
+    parser.add_argument("--mask_decoder", type=str, default="/opt/nanosam/data/mobile_sam_mask_decoder.engine")
     args = parser.parse_args()
 
     predictor = Predictor(
