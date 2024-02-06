@@ -37,7 +37,7 @@ ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 # commands will be appended/run by the entrypoint which sources the ROS environment
 COPY ros_entrypoint.sh /ros_entrypoint.sh
 
-# Install opencv, px4 autopilot, 
+# Install opencv, px4 autopilot for SITL implementation
 # We do not need offboard api, qgc, px4_msgs and micro_ros_agent in board.
 WORKDIR /workspace
 RUN git clone https://github.com/opencv/opencv.git && cd opencv && git checkout 4.3.0 && cd .. && \
@@ -61,6 +61,12 @@ RUN cd PX4-Autopilot && make clean && DONT_RUN=1 make px4_sitl_default gazebo-cl
 #     git clone -b $ROS_DISTRO https://github.com/micro-ROS/micro_ros_setup.git src/micro_ros_setup && \
 #     rosdep update && rosdep install --from-paths src --ignore-src -y && colcon build && . install/local_setup.sh && \
 #     ros2 run micro_ros_setup create_agent_ws.sh && ros2 run micro_ros_setup build_agent.sh
+
+
+# For our projects
+WORKDIR /workspace
+RUN git clone https://github.com/triple-Mu/YOLOv8-TensorRT.git && cd YOLOv8-TensorRT && pip install -r requirements.txt && pip install ultralytics && \
+    wget https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8s.pt
 
 WORKDIR /workspace
 RUN rm -rf /var/lib/apt/lists/* && apt-get clean
