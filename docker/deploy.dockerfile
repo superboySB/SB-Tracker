@@ -66,7 +66,15 @@ RUN cd PX4-Autopilot && make clean && DONT_RUN=1 make px4_sitl_default gazebo-cl
 # For our projects
 WORKDIR /workspace
 RUN git clone https://github.com/triple-Mu/YOLOv8-TensorRT.git && cd YOLOv8-TensorRT && pip install -r requirements.txt && pip install ultralytics && \
-    wget https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8s.pt
+    wget https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8m.pt && \
+    wget https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8m-oiv7.pt && \
+    wget https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8m-seg.pt && \
+    wget https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8m-pose.pt
+# Export *.pt to *.onnx
+RUN python3 export-det.py --weights yolov8m.pt --sim && \
+    python3 export-det.py --weights yolov8m-oiv7.pt --sim && \
+    python3 export-seg.py --weights yolov8m-seg.pt --sim && \
+    yolo export model=yolov8m-pose.pt format=onnx simplify=True
 
 WORKDIR /workspace
 RUN rm -rf /var/lib/apt/lists/* && apt-get clean
