@@ -27,7 +27,7 @@ ENV PYTHONIOENCODING=utf-8
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 1
     
 # build ROS from source
-COPY ros2_build.sh ros2_build.sh
+COPY docker/ros2_build.sh ros2_build.sh
 RUN . ros2_build.sh
 
 # Set the default DDS middleware to cyclonedds
@@ -35,7 +35,7 @@ RUN . ros2_build.sh
 ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
 # commands will be appended/run by the entrypoint which sources the ROS environment
-COPY ros_entrypoint.sh /ros_entrypoint.sh
+COPY docker/ros_entrypoint.sh /ros_entrypoint.sh
 
 # Install opencv, px4 autopilot for SITL implementation
 # We do not need offboard api, qgc, px4_msgs and micro_ros_agent in board.
@@ -65,17 +65,8 @@ RUN cd PX4-Autopilot && make clean && DONT_RUN=1 make px4_sitl_default gazebo-cl
 
 # For our projects
 WORKDIR /workspace
-RUN git clone https://github.com/triple-Mu/YOLOv8-TensorRT.git && cd YOLOv8-TensorRT && pip install -r requirements.txt && pip install ultralytics && \
-    pip install opencv-python==4.8.0.74
-# Export *.pt to *.onnx
-RUN wget https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8m.pt && \
-    wget https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8m-oiv7.pt && \
-    wget https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8m-seg.pt && \
-    wget https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8m-pose.pt
-RUN python3 export-det.py --weights yolov8m.pt --sim && \
-    python3 export-det.py --weights yolov8m-oiv7.pt --sim && \
-    python3 export-seg.py --weights yolov8m-seg.pt --sim && \
-    yolo export model=yolov8m-pose.pt format=onnx simplify=True
+RUN git clone https://github.com/triple-Mu/YOLOv8-TensorRT.git && cd YOLOv8-TensorRT && pip install --upgrade pip && \
+    pip install -r requirements.txt && pip install ultralytics && pip install opencv-python==4.8.0.74
 
 WORKDIR /workspace
 RUN rm -rf /var/lib/apt/lists/* && apt-get clean

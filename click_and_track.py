@@ -17,7 +17,7 @@ import cv2
 import numpy as np
 import argparse
 from nanosam.utils.predictor import Predictor
-from sam_tracker import Tracker
+from perception.sam_tracker import Tracker
 
 
 def init_track(event,x,y,flags,param):
