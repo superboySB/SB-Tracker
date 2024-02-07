@@ -3,7 +3,7 @@
 
 ## 当前进度
 有一些很明显要改进的点
-- [ ] 显然可以用yolo的检测框来辅助给SAM画box，会比之前标point要准确很多，通过grounding dino已经证明这样做有效。
+- [ ] 显然可以用yolo的检测框来辅助给SAM画box，会比之前标point要准确很多，通过grounding dino+SAM+diffusion已经证明这样做有效。
 
 ## 开箱即用
 ```sh
@@ -75,3 +75,7 @@ cd /workspace && git clone https://github.com/superboySB/SB-Tracker && cd SB-Tra
 
 python3 det-main.py
 ```
+![](assets/demo.gif)
+
+## Acknowledgement
+The work was done when the author visited Qiyuan Lab, supervised by [Chao Wang](https://scholar.google.com/citations?user=qmDGt-kAAAAJ&hl=zh-CN).

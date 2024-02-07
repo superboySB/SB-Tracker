@@ -46,6 +46,7 @@ def main(args: argparse.Namespace) -> None:
         bgr = frame
         image = bgr.copy()
         
+        # Using SAM
         if tracker.token is not None:
             mask, point, sam_box = tracker.update(image)
 
@@ -80,6 +81,7 @@ def main(args: argparse.Namespace) -> None:
                 tracker.reset()
                 mask = None
                 continue
+        # Using yolo
         else:
             bgr, ratio, dwdh = letterbox(bgr, (W, H))
             rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
