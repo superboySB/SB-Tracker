@@ -21,14 +21,14 @@ RUN git clone https://github.com/triple-Mu/YOLOv8-TensorRT.git && cd YOLOv8-Tens
     pip install -r requirements.txt && pip install ultralytics && pip install opencv-python==4.8.0.74
 # Export *.pt to *.onnx
 RUN cd /workspace/YOLOv8-TensorRT && \
-    wget https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8m.pt && \
-    wget https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8m-oiv7.pt && \
-    wget https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8m-seg.pt && \
-    wget https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8m-pose.pt
-RUN python3 export-det.py --weights yolov8m.pt --sim && \
-    python3 export-det.py --weights yolov8m-oiv7.pt --sim && \
-    python3 export-seg.py --weights yolov8m-seg.pt --sim && \
-    yolo export model=yolov8m-pose.pt format=onnx simplify=True
+    wget https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8s.pt && \
+    wget https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8s-oiv7.pt && \
+    wget https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8s-seg.pt && \
+    wget https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8s-pose.pt
+RUN python3 export-det.py --weights yolov8s.pt --sim && \
+    python3 export-det.py --weights yolov8s-oiv7.pt --sim && \
+    python3 export-seg.py --weights yolov8s-seg.pt --sim && \
+    yolo export model=yolov8s-pose.pt format=onnx simplify=True
 
 WORKDIR /workspace
 RUN rm -rf /var/lib/apt/lists/* && apt-get clean

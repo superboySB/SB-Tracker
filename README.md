@@ -14,23 +14,23 @@ docker exec -it sbtracker /bin/bash
 这一步一定要在台式机上(可以考虑使用`train.dockerfile`在run完的容器直接拿)，我们需要在docker中默认准备好的一个训练好的自带pytorch模型作为范例,然后添加bbox decoder、NMS后转为ONNX模型。
 ```sh
 cd /workspace/YOLOv8-TensorRT
-python3 export-det.py --weights yolov8m.pt --sim && \
-python3 export-det.py --weights yolov8m-oiv7.pt --sim && \
-python3 export-seg.py --weights yolov8m-seg.pt --sim && \
-yolo export model=yolov8m-pose.pt format=onnx simplify=True
+python3 export-det.py --weights yolov8s.pt --sim && \
+python3 export-det.py --weights yolov8s-oiv7.pt --sim && \
+python3 export-seg.py --weights yolov8s-seg.pt --sim && \
+yolo export model=yolov8s-pose.pt format=onnx simplify=True
 ```
 下一步一定要在jetson本机上，使用TensorRT的python api来适配几个yolo模型
 ```sh
 cd /workspace/YOLOv8-TensorRT
-/usr/src/tensorrt/bin/trtexec --onnx=yolov8m.onnx --saveEngine=yolov8m.engine --fp16 && \
-/usr/src/tensorrt/bin/trtexec --onnx=yolov8m-oiv7.onnx --saveEngine=yolov8m-oiv7.engine --fp16 && \
-/usr/src/tensorrt/bin/trtexec --onnx=yolov8m-seg.onnx --saveEngine=yolov8m-seg.engine --fp16 && \
-/usr/src/tensorrt/bin/trtexec --onnx=yolov8m-pose.onnx --saveEngine=yolov8m-pose.engine --fp16
+/usr/src/tensorrt/bin/trtexec --onnx=yolov8s.onnx --saveEngine=yolov8s.engine --fp16 && \
+/usr/src/tensorrt/bin/trtexec --onnx=yolov8s-oiv7.onnx --saveEngine=yolov8s-oiv7.engine --fp16 && \
+/usr/src/tensorrt/bin/trtexec --onnx=yolov8s-seg.onnx --saveEngine=yolov8s-seg.engine --fp16 && \
+/usr/src/tensorrt/bin/trtexec --onnx=yolov8s-pose.onnx --saveEngine=yolov8s-pose.engine --fp16
 ```
 测试yolo检测图片功能是否正常
 ```sh
-python3 infer-det.py \
-    --engine yolov8m.engine \
+python3 infer-det-camera.py \
+    --engine yolov8s.engine \
     --imgs data \
     --out-dir outputs \
     --device cuda:0
@@ -68,6 +68,8 @@ python3 examples/basic_usage.py \
 检验点击跟踪功能
 ```sh
 cd /workspace && git clone https://github.com/superboySB/SB-Tracker && cd SB-Tracker
+
+python3 det-camera.py
 
 python3 click_and_track.py
 ```

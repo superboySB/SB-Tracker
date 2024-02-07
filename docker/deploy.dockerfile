@@ -66,7 +66,7 @@ RUN cd PX4-Autopilot && make clean && DONT_RUN=1 make px4_sitl_default gazebo-cl
 # For our projects
 WORKDIR /workspace
 RUN git clone https://github.com/triple-Mu/YOLOv8-TensorRT.git && cd YOLOv8-TensorRT && pip install --upgrade pip && \
-    pip install -r requirements.txt && pip install ultralytics && pip install opencv-python==4.8.0.74
+    pip install -r requirements.txt && pip install ultralytics lapx && pip install opencv-python==4.8.0.74
 
 WORKDIR /workspace
 RUN rm -rf /var/lib/apt/lists/* && apt-get clean
