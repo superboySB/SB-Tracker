@@ -1,5 +1,9 @@
 # SB-Tracker
-开放环境下基于人机交互的UAV Tracker
+开放环境下基于人机交互的UAV Tracker，部署在Jetson Orin板载上(以NANO/NX)为例，会先用yolo给用户检测物体类别，然后用户用鼠标双击要跟踪的物体，即可跟踪物体。由于加载了端侧的Segment Anything模型，用户既可以点击指定类别的物体，也可以点击不在检测框的物体，都可以尝试跟踪，`r`为重置，`q`为退出。O(∩_∩)O
+
+## 当前进度
+有一些很明显要改进的点
+- [ ] 显然可以用yolo的检测框来辅助给SAM画box，会比之前标point要准确很多，通过grounding dino已经证明这样做有效。
 
 ## 开箱即用
 ```sh
@@ -11,7 +15,7 @@ docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DIS
 docker exec -it sbtracker /bin/bash
 ```
 ### 开放环境检测功能部署
-这一步一定要在台式机上(可以考虑使用`train.dockerfile`在run完的容器直接拿)，我们需要在docker中默认准备好的一个训练好的自带pytorch模型作为范例,然后添加bbox decoder、NMS后转为ONNX模型。
+这一步一定要在台式机上(可以考虑使用`train.dockerfile`在run完的容器直接拿onnx)，我们需要在docker中默认准备好的一个训练好的自带pytorch模型作为范例,然后添加bbox decoder、NMS后转为ONNX模型。
 ```sh
 cd /workspace/YOLOv8-TensorRT
 python3 export-det.py --weights yolov8s.pt --sim && \
@@ -64,12 +68,10 @@ python3 examples/basic_usage.py \
     --mask_decoder="data/mobile_sam_mask_decoder.engine"
 ```
 
-## 运行代码
+### 运行DEMO
 检验点击跟踪功能
 ```sh
 cd /workspace && git clone https://github.com/superboySB/SB-Tracker && cd SB-Tracker
 
-python3 det-camera.py
-
-python3 click_and_track.py
+python3 det-main.py
 ```

@@ -64,7 +64,7 @@ def main(args: argparse.Namespace) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument('--engine', type=str, default="/worksapce/YOLOv8-TensorRT/yolov8s.engine", help='Engine file')
+    parser.add_argument('--engine', type=str, default="/workspace/YOLOv8-TensorRT/yolov8s.engine", help='Engine file')
     parser.add_argument('--device', type=str, default='cuda:0', help='TensorRT infer device')
     return parser.parse_args()
 

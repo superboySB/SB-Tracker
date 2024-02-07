@@ -49,7 +49,7 @@ RUN cd /workspace/opencv && mkdir build && cd build && cmake -D CMAKE_BUILD_TYPE
       -D OPENCV_EXTRA_MODULES_PATH=/workspace/opencv_contrib/modules \
       -D BUILD_EXAMPLES=ON .. && make -j$(nproc) && make install
 WORKDIR /workspace
-RUN git clone https://github.com/PX4/PX4-Autopilot.git --recursive && bash PX4-Autopilot/Tools/setup/ubuntu.sh --no-nuttx
+RUN git clone https://github.com/PX4/PX4-Autopilot.git -b v1.14.1 --recursive && bash PX4-Autopilot/Tools/setup/ubuntu.sh --no-nuttx
 RUN cd PX4-Autopilot && make clean && DONT_RUN=1 make px4_sitl_default gazebo-classic
 # WORKDIR /workspace
 # RUN . $ROS_ROOT/install/setup.sh && git clone https://github.com/Jaeyoung-Lim/px4-offboard.git && cd px4-offboard && colcon build && cd ..
