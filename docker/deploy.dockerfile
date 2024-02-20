@@ -1,4 +1,5 @@
 # TODO： Need to be upgrade to r36.2 to support the latest tensorRT
+# FROM nvcr.io/nvidia/isaac/ros:aarch64-ros2_humble_b7e1ed6c02a6fa3c1c7392479291c035
 FROM dustynv/nanosam:r35.3.1
 
 # Please contact with me if you have problems

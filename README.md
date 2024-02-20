@@ -5,14 +5,33 @@
 有一些很明显要改进的点
 - [ ] 显然可以用yolo的检测框来辅助给SAM画box，会比之前标point要准确很多，通过grounding dino+SAM+diffusion已经证明这样做有效。
 
-## 开箱即用
+## 算法开发（云侧）
 ```sh
-docker build -f docker/deploy.dockerfile -t sbt_image:r35.3.1 .
+docker build -f docker/train.dockerfile -t sbt_image:train . --progress=plain
+
+# 如果连接了摄像头硬件就可以加--device /dev/video0:/dev/video0 
+docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DISPLAY --runtime=nvidia --network=host --ipc host --name=sbtracker-train sbt_image:train /bin/bash
+
+docker exec -it sbtracker-train /bin/bash
+```
+开始部署tensortRT下的ViT算法
+```sh
+# Export Encoder
+trtexec --onnx=assets/export_models/sam/onnx/l2_encoder.onnx --minShapes=input_image:1x3x512x512 --optShapes=input_image:4x3x512x512 --maxShapes=input_image:4x3x512x512 --saveEngine=assets/export_models/sam/tensorrt/l2_encoder.engine
+# Export Decoder
+trtexec --onnx=assets/export_models/sam/onnx/l2_decoder.onnx --minShapes=point_coords:1x1x2,point_labels:1x1 --optShapes=point_coords:16x2x2,point_labels:16x2 --maxShapes=point_coords:16x2x2,point_labels:16x2 --fp16 --saveEngine=assets/export_models/sam/tensorrt/l2_decoder.engine
+# TensorRT Inference
+python deployment/sam/tensorrt/inference.py --model l2 --encoder_engine assets/export_models/sam/tensorrt/l2_encoder.engine --decoder_engine assets/export_models/sam/tensorrt/l2_decoder.engine --mode point
+```
+
+## 算法部署（端侧）
+```sh
+docker build -f docker/deploy.dockerfile -t sbt_image:deploy . --progress=plain
 
 # 如果连接了摄像头硬件就可以加，确保摄像头安装:  ls /dev/video*
-docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DISPLAY --runtime=nvidia --device /dev/video0:/dev/video0 --device /dev/snd --device /dev/bus/usb --network=host --ipc host --name=sbtracker sbt_image:r35.3.1 /bin/bash
+docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DISPLAY --runtime=nvidia --device /dev/video0:/dev/video0 --device /dev/snd --device /dev/bus/usb --network=host --ipc host --name=sbtracker-deploy sbt_image:deploy /bin/bash
 
-docker exec -it sbtracker /bin/bash
+docker exec -it sbtracker-deploy /bin/bash
 ```
 ### 开放环境检测功能部署
 这一步一定要在台式机上(可以考虑使用`train.dockerfile`在run完的容器直接拿onnx)，我们需要在docker中默认准备好的一个训练好的自带pytorch模型作为范例,然后添加bbox decoder、NMS后转为ONNX模型。
