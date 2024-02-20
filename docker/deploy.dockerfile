@@ -1,3 +1,4 @@
+# TODO： Need to be upgrade to r36.2 to support the latest tensorRT
 FROM dustynv/nanosam:r35.3.1
 
 # Please contact with me if you have problems
