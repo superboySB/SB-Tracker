@@ -5,7 +5,7 @@
 有一些很明显要改进的点
 - [ ] 显然可以用yolo的检测框来辅助给SAM画box，会比之前标point要准确很多，通过grounding dino+SAM+diffusion已经证明这样做有效。
 
-## 算法开发（云侧）
+## 算法开发/云上服务（服务器侧）
 ```sh
 docker build -f docker/train.dockerfile -t sbt_image:train . --progress=plain --no-cache=false
 
@@ -14,36 +14,25 @@ docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DIS
 
 docker exec -it sbtracker-train /bin/bash
 ```
-**(Optional)** 这一步一定要在台式机上(也可以考虑使用`train.dockerfile`在run完的容器直接拿onnx)，我们需要在docker中默认准备好的一个训练好的自带pytorch模型作为范例,然后添加bbox decoder、NMS后转为ONNX模型。
+开始部署服务器侧优化的SiamMask算法(当前仅支持转为onnx，参考[博客](https://vjraj.dev/blog/siammask_onnx_export/))
 ```sh
-cd /workspace/YOLOv8-TensorRT
-python3 export-det.py --weights yolov8s.pt --sim && \
-python3 export-seg.py --weights yolov8s-seg.pt --sim && \
-yolo export model=yolov8s-pose.pt format=onnx simplify=True
+cd /workspace/Siammask/ && python export.py
 ```
-开始部署云侧优化的YoloV8算法
+开始部署服务器侧优化的ViT算法 (调试需要`--verbose`,xl1和l2模型的性价比详见[韩松团队介绍](https://github.com/mit-han-lab/efficientvit/blob/master/applications/sam.md))
 ```sh
-cd /workspace/YOLOv8-TensorRT
-/usr/src/tensorrt/bin/trtexec --onnx=yolov8s.onnx --saveEngine=yolov8s.engine --fp16 && \
-/usr/src/tensorrt/bin/trtexec --onnx=yolov8s-seg.onnx --saveEngine=yolov8s-seg.engine --fp16 && \
-/usr/src/tensorrt/bin/trtexec --onnx=yolov8s-pose.onnx --saveEngine=yolov8s-pose.engine --fp16
-```
-开始部署云侧优化的SiamMask算法(当前仅支持onnx，参考[博客](https://vjraj.dev/blog/siammask_onnx_export/))
-```sh
-cd /workspace/Siammask/
-python export.py && python main.py --model siammask_vot_simp.onnx
-```
-开始部署云侧优化的ViT算法 (调试需要`--verbose`,xl1和l2模型的性价比详见[韩松团队介绍](https://github.com/mit-han-lab/efficientvit/blob/master/applications/sam.md))
-```sh
-# Export Encoder
-trtexec --onnx=assets/export_models/sam/onnx/xl1_encoder.onnx --minShapes=input_image:1x3x1024x1024 --optShapes=input_image:4x3x1024x1024 --maxShapes=input_image:4x3x1024x1024 --saveEngine=assets/export_models/sam/tensorrt/xl1_encoder.engine
-# Export Decoder
+# Export Encoder and Decoder
+trtexec --onnx=assets/export_models/sam/onnx/xl1_encoder.onnx --minShapes=input_image:1x3x1024x1024 --optShapes=input_image:4x3x1024x1024 --maxShapes=input_image:4x3x1024x1024 --saveEngine=assets/export_models/sam/tensorrt/xl1_encoder.engine && \
 trtexec --onnx=assets/export_models/sam/onnx/xl1_decoder.onnx --minShapes=point_coords:1x1x2,point_labels:1x1 --optShapes=point_coords:16x2x2,point_labels:16x2 --maxShapes=point_coords:16x2x2,point_labels:16x2 --fp16 --saveEngine=assets/export_models/sam/tensorrt/xl1_decoder.engine
-# TensorRT Inference
-python deployment/sam/tensorrt/inference.py --model xl1 --encoder_engine assets/export_models/sam/tensorrt/xl1_encoder.engine --decoder_engine assets/export_models/sam/tensorrt/xl1_decoder.engine --mode point
 ```
+尝试运行服务器的指哪儿打哪儿代码
+```sh
+cd /workspace && git clone https://github.com/superboySB/SB-Tracker && cd SB-Tracker
 
-## 算法部署（端侧）
+python main_server.py --yolo_model_type=v8l --sam_model_type=xl1 --class_names="red box,green pencil,white box"
+```
+这里包含一个开集检测器，可以自己定义感兴趣的类别`--class_names`
+
+## 算法部署/搞机测试（端侧）
 ```sh
 docker build -f docker/deploy.dockerfile -t sbt_image:deploy . --progress=plain
 
@@ -52,54 +41,8 @@ docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DIS
 
 docker exec -it sbtracker-deploy /bin/bash
 ```
-### 开放环境检测功能部署
-这一步一定要在jetson本机上，使用TensorRT的python api来适配几个yolo模型
-```sh
-cd /workspace/YOLOv8-TensorRT
-/usr/src/tensorrt/bin/trtexec --onnx=yolov8s.onnx --saveEngine=yolov8s.engine --fp16 && \
-/usr/src/tensorrt/bin/trtexec --onnx=yolov8s-oiv7.onnx --saveEngine=yolov8s-oiv7.engine --fp16 && \
-/usr/src/tensorrt/bin/trtexec --onnx=yolov8s-seg.onnx --saveEngine=yolov8s-seg.engine --fp16 && \
-/usr/src/tensorrt/bin/trtexec --onnx=yolov8s-pose.onnx --saveEngine=yolov8s-pose.engine --fp16
-```
-测试yolo检测图片功能是否正常
-```sh
-python3 infer-det-camera.py \
-    --engine yolov8s.engine \
-    --imgs data \
-    --out-dir outputs \
-    --device cuda:0
-```
 
-### 开放环境分割功能部署
-先去适配一下nanosam的推理加速
-```sh
-cd /opt/nanosam
-```
-将mask decoder部分适配TensorRT
-```sh
-/usr/src/tensorrt/bin/trtexec \
-    --onnx=data/mobile_sam_mask_decoder.onnx \
-    --saveEngine=data/mobile_sam_mask_decoder.engine \
-    --minShapes=point_coords:1x1x2,point_labels:1x1 \
-    --optShapes=point_coords:1x1x2,point_labels:1x1 \
-    --maxShapes=point_coords:1x10x2,point_labels:1x10
-```
-将resnet18 encoder部分适配TensorRT
-```sh
-/usr/src/tensorrt/bin/trtexec \
-        --onnx=data/resnet18_image_encoder.onnx \
-        --saveEngine=data/resnet18_image_encoder.engine \
-        --fp16
-```
-检验基本功能
-```sh
-python3 examples/basic_usage.py \
-    --image_encoder="data/resnet18_image_encoder.engine" \
-    --mask_decoder="data/mobile_sam_mask_decoder.engine"
-```
-
-### 运行DEMO
-检验点击跟踪功能
+尝试运行jetson的指哪儿打哪儿代码
 ```sh
 cd /workspace && git clone https://github.com/superboySB/SB-Tracker && cd SB-Tracker
 

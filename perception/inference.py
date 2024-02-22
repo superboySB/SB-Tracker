@@ -10,7 +10,7 @@ import torch
 import torch.nn.functional as F
 import torchvision.transforms as transforms
 import yaml
-from inferencer import SAMDecoderInferencer, SAMEncoderInferencer
+from .inferencer import SAMDecoderInferencer, SAMEncoderInferencer
 from torchvision.transforms.functional import resize
 
 
@@ -57,12 +57,6 @@ def show_mask(mask, ax, random_color=False):
     h, w = mask.shape[-2:]
     mask_image = mask.reshape(h, w, 1) * color.reshape(1, 1, -1)
     ax.imshow(mask_image)
-
-
-def show_box(box, ax):
-    x0, y0 = box[0], box[1]
-    w, h = box[2] - box[0], box[3] - box[1]
-    ax.add_patch(plt.Rectangle((x0, y0), w, h, edgecolor="green", facecolor=(0, 0, 0, 0), lw=2))
 
 
 def show_points(coords, labels, ax, marker_size=375):
@@ -141,18 +135,32 @@ def apply_coords(coords, original_size, new_size):
     return coords
 
 
-def apply_boxes(boxes, original_size, new_size):
-    boxes = apply_coords(boxes.reshape(-1, 2, 2), original_size, new_size)
-    return boxes
 
+def calculate_bounding_box(mask):
+    """
+    Calculate the bounding box coordinates from the mask.
+    """
+    pos = np.where(mask)
+    x_min = np.min(pos[1])
+    x_max = np.max(pos[1])
+    y_min = np.min(pos[0])
+    y_max = np.max(pos[0])
+    return x_min, y_min, x_max, y_max
 
+def show_bounding_box(ax, bbox, color='red', linewidth=2):
+    """
+    Display the bounding box on the image.
+    """
+    x_min, y_min, x_max, y_max = bbox
+    ax.add_patch(plt.Rectangle((x_min, y_min), x_max-x_min, y_max-y_min, edgecolor=color, facecolor='none', linewidth=linewidth))
+    
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=str, required=True, help="model type.")
     parser.add_argument("--encoder_engine", type=str, required=True, help="TRT engine.")
     parser.add_argument("--decoder_engine", type=str, required=True, help="TRT engine.")
-    parser.add_argument("--img_path", type=str, default="assets/fig/cat.jpg")
-    parser.add_argument("--out_path", type=str, default="assets/demo/efficientvit_sam_demo_tensorrt.png")
+    parser.add_argument("--img_path", type=str, default="assets/bus.jpg")
+    parser.add_argument("--out_path", type=str, default="assets/efficientvit_sam_demo_tensorrt.png")
     parser.add_argument("--mode", type=str, default="point", choices=["point", "boxes"])
     parser.add_argument("--point", type=str, default=None)
     parser.add_argument("--boxes", type=str, default=None)
@@ -175,58 +183,31 @@ if __name__ == "__main__":
 
     input_size = get_preprocess_shape(*origin_image_size, long_side_length=1024)
 
-    if args.mode == "point":
-        H, W, _ = raw_img.shape
-        point = np.array(yaml.safe_load(args.point or f"[[[{W // 2}, {H // 2}, {1}]]]"), dtype=np.float32)
-        point_coords = point[..., :2]
-        point_labels = point[..., 2]
-        orig_point_coords = deepcopy(point_coords)
-        orig_point_labels = deepcopy(point_labels)
-        point_coords = apply_coords(point_coords, origin_image_size, input_size).astype(np.float32)
+    H, W, _ = raw_img.shape
+    point = np.array(yaml.safe_load(args.point or f"[[[{W // 2}, {H // 2}, {1}]]]"), dtype=np.float32)
+    point_coords = point[..., :2]
+    point_labels = point[..., 2]
+    orig_point_coords = deepcopy(point_coords)
+    orig_point_labels = deepcopy(point_labels)
+    point_coords = apply_coords(point_coords, origin_image_size, input_size).astype(np.float32)
 
-        inputs = (image_embedding, point_coords, point_labels)
+    inputs = (image_embedding, point_coords, point_labels)
 
-        trt_decoder = SAMDecoderInferencer(args.decoder_engine, num=point.shape[1], batch_size=1)
-        low_res_masks, _ = trt_decoder.infer(inputs)
-        low_res_masks = low_res_masks.reshape(1, 1, 256, 256)
+    trt_decoder = SAMDecoderInferencer(args.decoder_engine, num=point.shape[1], batch_size=1)
+    low_res_masks, _ = trt_decoder.infer(inputs)
+    low_res_masks = low_res_masks.reshape(1, 1, 256, 256)
 
-        masks = mask_postprocessing(low_res_masks, origin_image_size)
-        masks = masks > 0.0
+    masks = mask_postprocessing(low_res_masks, origin_image_size)
+    masks = masks > 0.0
 
-        plt.imshow(raw_img)
-        for mask in masks:
-            show_mask(mask, plt.gca())
-        show_points(orig_point_coords, orig_point_labels, plt.gca())
-        plt.axis("off")
-        plt.savefig(args.out_path, bbox_inches="tight", dpi=300, pad_inches=0.0)
-        print(f"Result saved in {args.out_path}")
+    plt.imshow(raw_img)
+    
+    bbox = calculate_bounding_box(masks[0].squeeze().numpy())
+    show_bounding_box(plt.gca(), bbox)
+    show_mask(masks[0], plt.gca())
+    show_points(orig_point_coords, orig_point_labels, plt.gca())
+    plt.axis("off")
+    plt.savefig(args.out_path, bbox_inches="tight", dpi=300, pad_inches=0.0)
+    print(f"Result saved in {args.out_path}")
 
-    elif args.mode == "boxes":
-        boxes = np.array(yaml.safe_load(args.boxes), dtype=np.float32)
-        orig_boxes = deepcopy(boxes)
 
-        boxes = apply_boxes(boxes, origin_image_size, input_size).astype(np.float32)
-        box_label = np.array([[2, 3] for _ in range(boxes.shape[0])], dtype=np.float32).reshape((-1, 2))
-        point_coords = boxes
-        point_labels = box_label
-
-        inputs = (image_embedding, point_coords, point_labels)
-
-        trt_decoder = SAMDecoderInferencer(args.decoder_engine, num=len(orig_boxes) * 2, batch_size=1)
-        low_res_masks, _ = trt_decoder.infer(inputs)
-        low_res_masks = low_res_masks.reshape(1, 1, 256, 256)
-
-        masks = mask_postprocessing(low_res_masks, origin_image_size)
-        masks = masks > 0.0
-
-        plt.imshow(raw_img)
-        for mask in masks:
-            show_mask(mask, plt.gca())
-        for box in orig_boxes:
-            show_box(box, plt.gca())
-        plt.axis("off")
-        plt.savefig(args.out_path, bbox_inches="tight", dpi=300, pad_inches=0.0)
-        print(f"Result saved in {args.out_path}")
-
-    else:
-        raise NotImplementedError
