@@ -10,9 +10,7 @@ import torch.nn.functional as F
 import torchvision.transforms as transforms
 from torchvision.transforms.functional import resize
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(BASE_DIR)))
-sys.path.append(ROOT_DIR)
+sys.path.append("/workspace/efficientvit/")
 
 from efficientvit.models.efficientvit.sam import EfficientViTSam
 from efficientvit.sam_model_zoo import create_sam_model

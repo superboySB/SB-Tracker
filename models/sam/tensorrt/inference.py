@@ -134,27 +134,9 @@ def apply_coords(coords, original_size, new_size):
     coords[..., 1] = coords[..., 1] * (new_h / old_h)
     return coords
 
-
-
-def calculate_bounding_box(mask):
-    """
-    Calculate the bounding box coordinates from the mask.
-    """
-    pos = np.where(mask)
-    x_min = np.min(pos[1])
-    x_max = np.max(pos[1])
-    y_min = np.min(pos[0])
-    y_max = np.max(pos[0])
-    return x_min, y_min, x_max, y_max
-
-def show_bounding_box(ax, bbox, color='red', linewidth=2):
-    """
-    Display the bounding box on the image.
-    """
-    x_min, y_min, x_max, y_max = bbox
-    ax.add_patch(plt.Rectangle((x_min, y_min), x_max-x_min, y_max-y_min, edgecolor=color, facecolor='none', linewidth=linewidth))
     
 if __name__ == "__main__":
+    from main import *
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=str, required=True, help="model type.")
     parser.add_argument("--encoder_engine", type=str, required=True, help="TRT engine.")

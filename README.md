@@ -16,7 +16,7 @@ docker exec -it sbtracker-train /bin/bash
 ```
 开始部署服务器侧优化的SiamMask算法(当前仅支持转为onnx，参考[博客](https://vjraj.dev/blog/siammask_onnx_export/))
 ```sh
-cd /workspace/Siammask/ && python export.py
+cd /workspace/SiamMask/ && python export.py
 ```
 开始部署服务器侧优化的ViT算法 (调试需要`--verbose`,xl1和l2模型的性价比详见[韩松团队介绍](https://github.com/mit-han-lab/efficientvit/blob/master/applications/sam.md))
 ```sh
@@ -44,13 +44,13 @@ docker exec -it sbtracker-deploy /bin/bash
 ```
 开始部署端侧优化的SiamMask算法，原理同服务器侧
 ```sh
-cd /workspace/Siammask/ && python export.py
+cd /workspace/SiamMask/ && python export.py
 ```
 考虑硬件通用性，ViT算法只转化为ONNX，这一步已经在dockerfile里面完成了，因此可以直接尝试运行jetson的指哪儿打哪儿代码
 ```sh
 cd /workspace && git clone https://github.com/superboySB/SB-Tracker && cd SB-Tracker
 
-python main.py --device_type=deployment --yolo_model_type=v8l --sam_model_type=xl1 --class_names="red box,green pencil,white box"
+python main.py --device_type=deployment --yolo_model_type=v8l --sam_model_type=l2 --class_names="red box,green pencil,white box"
 ```
 ![](assets/demo.gif)
 

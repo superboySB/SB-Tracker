@@ -6,9 +6,31 @@ import math
 import numpy as np
 import argparse
 
+def calculate_bounding_box(mask):
+    """
+    Calculate the bounding box coordinates from the mask.
+    """
+    pos = np.where(mask)
+    x_min = np.min(pos[1])
+    x_max = np.max(pos[1])
+    y_min = np.min(pos[0])
+    y_max = np.max(pos[0])
+    return x_min, y_min, x_max, y_max
+
+def show_bounding_box(ax, bbox, color='red', linewidth=2):
+    """
+    Display the bounding box on the image.
+    """
+    x_min, y_min, x_max, y_max = bbox
+    ax.add_patch(plt.Rectangle((x_min, y_min), x_max-x_min, y_max-y_min, edgecolor=color, facecolor='none', linewidth=linewidth))
 
 def click_event(event, x, y, flags, param):
-    global selected_box, boxes_info,latest_img,sam_encoder,sam_decoder
+    global selected_box, boxes_info,latest_img
+    sam_encoder = param['sam_encoder']
+    sam_decoder = param['sam_decoder']
+    sam_model_type = param['sam_model_type']
+    device_type = param['device_type']
+    
     if event == cv2.EVENT_LBUTTONDOWN:
         min_area = float('inf')
         selected_box = None
@@ -20,9 +42,14 @@ def click_event(event, x, y, flags, param):
                 if area < min_area:
                     min_area = area
                     selected_box = box
-        if selected_box is None:
+        if selected_box is None and device_type == "server":
             origin_image_size = latest_img.shape[:2]
-            img = preprocess(cv2.cvtColor(latest_img,cv2.COLOR_BGR2RGB), img_size=1024)
+            if sam_model_type == "xl1":
+                img = preprocess(cv2.cvtColor(latest_img,cv2.COLOR_BGR2RGB), img_size=1024)
+            elif sam_model_type == "l2":
+                img = preprocess(cv2.cvtColor(latest_img,cv2.COLOR_BGR2RGB), img_size=512)
+            else:
+                raise NotImplementedError 
 
             image_embedding = sam_encoder.infer(img)
             image_embedding = image_embedding[0].reshape(1, 256, 64, 64)
@@ -45,8 +72,29 @@ def click_event(event, x, y, flags, param):
             bbox = calculate_bounding_box(masks[0].squeeze().numpy())
             selected_box = bbox
 
-cv2.namedWindow("Webcam")
-cv2.setMouseCallback("Webcam", click_event)
+        if selected_box is None and device_type == "deployment":
+            origin_image_size = latest_img.shape[:2]
+            if sam_model_type == "xl1":
+                img = preprocess(cv2.cvtColor(latest_img,cv2.COLOR_BGR2RGB), img_size=1024)
+            elif sam_model_type == "l2":
+                img = preprocess(cv2.cvtColor(latest_img,cv2.COLOR_BGR2RGB), img_size=512)
+            else:
+                raise NotImplementedError
+            img_embeddings = sam_encoder(img)
+
+            point = np.array([[[x, y, 1]]], dtype=np.float32)
+            point_coords = point[..., :2]
+            point_labels = point[..., 2]
+
+            masks, _, _ = sam_decoder.run(
+                img_embeddings=img_embeddings,
+                origin_image_size=origin_image_size,
+                point_coords=point_coords,
+                point_labels=point_labels,
+            )
+            bbox = calculate_bounding_box(masks[0].squeeze().numpy())
+            selected_box = bbox
+
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
@@ -68,8 +116,8 @@ if __name__=="__main__":
         sam_decoder = SAMDecoderInferencer(f"/workspace/efficientvit/assets/export_models/sam/tensorrt/{args.sam_model_type}_decoder.engine", num=1, batch_size=1)
     elif args.device_type == "deployment":
         from models.sam.onnx.inference import *
-        encoder = SamEncoder(model_path=f"/workspace/efficientvit/assets/export_models/sam/onnx/{args.sam_model_type}_eecoder.onnx")
-        decoder = SamDecoder(model_path=f"/workspace/efficientvit/assets/export_models/sam/onnx/{args.sam_model_type}_decoder.onnx")
+        sam_encoder = SamEncoder(model_path=f"/workspace/efficientvit/assets/export_models/sam/onnx/{args.sam_model_type}_encoder.onnx")
+        sam_decoder = SamDecoder(model_path=f"/workspace/efficientvit/assets/export_models/sam/onnx/{args.sam_model_type}_decoder.onnx")
     else:
         raise NotImplementedError
 
@@ -78,6 +126,15 @@ if __name__=="__main__":
     detect_model.set_classes(classNames)
 
     # 初始化摄像头
+    cv2.namedWindow("Webcam")
+    # 创建包含所需变量的字典
+    params = {
+        'sam_encoder': sam_encoder,
+        'sam_decoder': sam_decoder,
+        'sam_model_type': args.sam_model_type,
+        'device_type': args.device_type,
+    }
+    cv2.setMouseCallback("Webcam", click_event, params)
     cap = cv2.VideoCapture(0)
     cap.set(3, 640)
     cap.set(4, 480)
