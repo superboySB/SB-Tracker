@@ -1,25 +1,14 @@
 from ultralytics import YOLO
+from models.siammask import SiamMask
+
 import cv2
 import math
 import numpy as np
-from models.siammask import SiamMask
-
 import argparse
-from copy import deepcopy
-from typing import Any, Tuple, Union
-
-import numpy as np
-import torch
-import torch.nn.functional as F
-import torchvision.transforms as transforms
-import yaml
-from perception.inferencer import SAMDecoderInferencer, SAMEncoderInferencer
-from perception.inference import *
-from torchvision.transforms.functional import resize
 
 
 def click_event(event, x, y, flags, param):
-    global selected_box, boxes_info,latest_img,trt_encoder,trt_decoder
+    global selected_box, boxes_info,latest_img,sam_encoder,sam_decoder
     if event == cv2.EVENT_LBUTTONDOWN:
         min_area = float('inf')
         selected_box = None
@@ -35,7 +24,7 @@ def click_event(event, x, y, flags, param):
             origin_image_size = latest_img.shape[:2]
             img = preprocess(cv2.cvtColor(latest_img,cv2.COLOR_BGR2RGB), img_size=1024)
 
-            image_embedding = trt_encoder.infer(img)
+            image_embedding = sam_encoder.infer(img)
             image_embedding = image_embedding[0].reshape(1, 256, 64, 64)
 
             input_size = get_preprocess_shape(*origin_image_size, long_side_length=1024)
@@ -47,7 +36,7 @@ def click_event(event, x, y, flags, param):
 
             inputs = (image_embedding, point_coords, point_labels)
 
-            low_res_masks, _ = trt_decoder.infer(inputs)
+            low_res_masks, _ = sam_decoder.infer(inputs)
             low_res_masks = low_res_masks.reshape(1, 1, 256, 256)
 
             masks = mask_postprocessing(low_res_masks, origin_image_size)
@@ -61,6 +50,7 @@ cv2.setMouseCallback("Webcam", click_event)
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--device_type", type=str, required=True, help="server/deployment")
     parser.add_argument("--yolo_model_type", type=str, required=True, help="v8l/v8s")
     parser.add_argument("--sam_model_type", type=str, required=True, help="l2/xl1")
     parser.add_argument("--enter_to_track", action="store_true", help="是否点完了按回车才track，默认是点了就track")
@@ -71,8 +61,17 @@ if __name__=="__main__":
     # 初始化YOLO模型
     detect_model = YOLO(f"/workspace/YOLOv8-TensorRT/yolo{args.yolo_model_type}-world.pt")
     track_model = SiamMask("/workspace/SiamMask/siammask_vot_simp.onnx")
-    trt_encoder = SAMEncoderInferencer(f"/workspace/efficientvit/assets/export_models/sam/tensorrt/{args.sam_model_type}_encoder.engine", batch_size=1)
-    trt_decoder = SAMDecoderInferencer(f"/workspace/efficientvit/assets/export_models/sam/tensorrt/{args.sam_model_type}_decoder.engine", num=1, batch_size=1)
+    if args.device_type == "server":
+        from models.sam.tensorrt.inferencer import SAMDecoderInferencer, SAMEncoderInferencer
+        from models.sam.tensorrt.inference import *
+        sam_encoder = SAMEncoderInferencer(f"/workspace/efficientvit/assets/export_models/sam/tensorrt/{args.sam_model_type}_encoder.engine", batch_size=1)
+        sam_decoder = SAMDecoderInferencer(f"/workspace/efficientvit/assets/export_models/sam/tensorrt/{args.sam_model_type}_decoder.engine", num=1, batch_size=1)
+    elif args.device_type == "deployment":
+        from models.sam.onnx.inference import *
+        encoder = SamEncoder(model_path=f"/workspace/efficientvit/assets/export_models/sam/onnx/{args.sam_model_type}_eecoder.onnx")
+        decoder = SamDecoder(model_path=f"/workspace/efficientvit/assets/export_models/sam/onnx/{args.sam_model_type}_decoder.onnx")
+    else:
+        raise NotImplementedError
 
     # Define custom classes
     classNames = args.class_names.split(',')    

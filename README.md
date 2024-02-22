@@ -3,7 +3,7 @@
 
 ## 当前进度
 有一些很明显要改进的点
-- [ ] 显然可以用yolo的检测框来辅助给SAM画box，会比之前标point要准确很多，通过grounding dino+SAM+diffusion已经证明这样做有效。
+- [X] 显然可以用yolo的检测框来辅助给SAM画box，会比之前标point要准确很多，通过grounding dino+SAM+diffusion已经证明这样做有效。
 
 ## 算法开发/云上服务（服务器侧）
 ```sh
@@ -28,9 +28,10 @@ trtexec --onnx=assets/export_models/sam/onnx/xl1_decoder.onnx --minShapes=point_
 ```sh
 cd /workspace && git clone https://github.com/superboySB/SB-Tracker && cd SB-Tracker
 
-python main_server.py --yolo_model_type=v8l --sam_model_type=xl1 --class_names="red box,green pencil,white box"
+python main.py --device_type=server --yolo_model_type=v8l --sam_model_type=xl1 --class_names="red box,green pencil,white box"
 ```
 这里包含一个开集检测器，可以自己定义感兴趣的类别`--class_names`
+
 
 ## 算法部署/搞机测试（端侧）
 ```sh
@@ -41,12 +42,15 @@ docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DIS
 
 docker exec -it sbtracker-deploy /bin/bash
 ```
-
-尝试运行jetson的指哪儿打哪儿代码
+开始部署端侧优化的SiamMask算法，原理同服务器侧
+```sh
+cd /workspace/Siammask/ && python export.py
+```
+考虑硬件通用性，ViT算法只转化为ONNX，这一步已经在dockerfile里面完成了，因此可以直接尝试运行jetson的指哪儿打哪儿代码
 ```sh
 cd /workspace && git clone https://github.com/superboySB/SB-Tracker && cd SB-Tracker
 
-python3 det-main.py
+python main.py --device_type=deployment --yolo_model_type=v8l --sam_model_type=xl1 --class_names="red box,green pencil,white box"
 ```
 ![](assets/demo.gif)
 

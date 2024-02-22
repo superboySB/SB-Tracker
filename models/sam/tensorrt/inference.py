@@ -166,7 +166,7 @@ if __name__ == "__main__":
     parser.add_argument("--boxes", type=str, default=None)
     args = parser.parse_args()
 
-    trt_encoder = SAMEncoderInferencer(args.encoder_engine, batch_size=1)
+    sam_encoder = SAMEncoderInferencer(args.encoder_engine, batch_size=1)
 
     raw_img = cv2.cvtColor(cv2.imread(args.img_path), cv2.COLOR_BGR2RGB)
     origin_image_size = raw_img.shape[:2]
@@ -178,7 +178,7 @@ if __name__ == "__main__":
     else:
         raise NotImplementedError
 
-    image_embedding = trt_encoder.infer(img)
+    image_embedding = sam_encoder.infer(img)
     image_embedding = image_embedding[0].reshape(1, 256, 64, 64)
 
     input_size = get_preprocess_shape(*origin_image_size, long_side_length=1024)
@@ -193,8 +193,8 @@ if __name__ == "__main__":
 
     inputs = (image_embedding, point_coords, point_labels)
 
-    trt_decoder = SAMDecoderInferencer(args.decoder_engine, num=point.shape[1], batch_size=1)
-    low_res_masks, _ = trt_decoder.infer(inputs)
+    sam_decoder = SAMDecoderInferencer(args.decoder_engine, num=point.shape[1], batch_size=1)
+    low_res_masks, _ = sam_decoder.infer(inputs)
     low_res_masks = low_res_masks.reshape(1, 1, 256, 256)
 
     masks = mask_postprocessing(low_res_masks, origin_image_size)

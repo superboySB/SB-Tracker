@@ -66,9 +66,25 @@ RUN cd PX4-Autopilot && make clean && DONT_RUN=1 make px4_sitl_default gazebo-cl
 
 
 # For our projects
+# YOLO-World
 WORKDIR /workspace
-RUN git clone https://github.com/triple-Mu/YOLOv8-TensorRT.git && cd YOLOv8-TensorRT && pip install --upgrade pip && \
-    pip install -r requirements.txt && pip install ultralytics lapx && pip install opencv-python==4.8.0.74
+RUN git clone https://github.com/superboySB/YOLOv8-TensorRT.git && cd YOLOv8-TensorRT && pip install --upgrade pip && pip install -r requirements.txt && \
+    python test_yoloworld.py
+# EfficientViT + SAM
+WORKDIR /workspace
+RUN git clone https://github.com/superboySB/efficientvit.git
+RUN cd efficientvit && pip install -r requirements.txt && mkdir -p assets/checkpoints/sam && cd assets/checkpoints/sam && \
+    wget https://huggingface.co/han-cai/efficientvit-sam/resolve/main/l2.pt && \
+    wget https://huggingface.co/han-cai/efficientvit-sam/resolve/main/xl1.pt
+RUN cd /workspace/efficientvit/ && \
+    python deployment/sam/onnx/export_encoder.py --model l2 --weight_url assets/checkpoints/sam/l2.pt --output assets/export_models/sam/onnx/l2_encoder.onnx && \ 
+    python deployment/sam/onnx/export_decoder.py --model l2 --weight_url assets/checkpoints/sam/l2.pt --output assets/export_models/sam/onnx/l2_decoder.onnx --return-single-mask && \
+    python deployment/sam/onnx/export_encoder.py --model xl1 --weight_url assets/checkpoints/sam/xl1.pt --output assets/export_models/sam/onnx/xl1_encoder.onnx && \ 
+    python deployment/sam/onnx/export_decoder.py --model xl1 --weight_url assets/checkpoints/sam/xl1.pt --output assets/export_models/sam/onnx/xl1_decoder.onnx --return-single-mask
+# Siammask
+WORKDIR /workspace
+RUN git clone https://github.com/superboySB/SiamMask && cd SiamMask && pip install onnxoptimizer && bash make.sh
+
 
 WORKDIR /workspace
 RUN rm -rf /var/lib/apt/lists/* && apt-get clean
