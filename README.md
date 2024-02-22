@@ -14,14 +14,28 @@ docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DIS
 
 docker exec -it sbtracker-train /bin/bash
 ```
-开始部署tensortRT下的ViT算法
+**(Optional)** 这一步一定要在台式机上(也可以考虑使用`train.dockerfile`在run完的容器直接拿onnx)，我们需要在docker中默认准备好的一个训练好的自带pytorch模型作为范例,然后添加bbox decoder、NMS后转为ONNX模型。
+```sh
+cd /workspace/YOLOv8-TensorRT
+python3 export-det.py --weights yolov8s.pt --sim && \
+python3 export-seg.py --weights yolov8s-seg.pt --sim && \
+yolo export model=yolov8s-pose.pt format=onnx simplify=True
+```
+开始部署云侧优化的YoloV8算法
+```sh
+cd /workspace/YOLOv8-TensorRT
+/usr/src/tensorrt/bin/trtexec --onnx=yolov8s.onnx --saveEngine=yolov8s.engine --fp16 && \
+/usr/src/tensorrt/bin/trtexec --onnx=yolov8s-seg.onnx --saveEngine=yolov8s-seg.engine --fp16 && \
+/usr/src/tensorrt/bin/trtexec --onnx=yolov8s-pose.onnx --saveEngine=yolov8s-pose.engine --fp16
+```
+开始部署云侧优化的ViT算法 (调试需要`--verbose`,xl1和l2模型的性价比详见[韩松团队介绍](https://github.com/mit-han-lab/efficientvit/blob/master/applications/sam.md))
 ```sh
 # Export Encoder
-trtexec --onnx=assets/export_models/sam/onnx/l2_encoder.onnx --minShapes=input_image:1x3x512x512 --optShapes=input_image:4x3x512x512 --maxShapes=input_image:4x3x512x512 --saveEngine=assets/export_models/sam/tensorrt/l2_encoder.engine
+trtexec --onnx=assets/export_models/sam/onnx/xl1_encoder.onnx --minShapes=input_image:1x3x1024x1024 --optShapes=input_image:4x3x1024x1024 --maxShapes=input_image:4x3x1024x1024 --saveEngine=assets/export_models/sam/tensorrt/xl1_encoder.engine
 # Export Decoder
-trtexec --onnx=assets/export_models/sam/onnx/l2_decoder.onnx --minShapes=point_coords:1x1x2,point_labels:1x1 --optShapes=point_coords:16x2x2,point_labels:16x2 --maxShapes=point_coords:16x2x2,point_labels:16x2 --fp16 --saveEngine=assets/export_models/sam/tensorrt/l2_decoder.engine
+trtexec --onnx=assets/export_models/sam/onnx/xl1_decoder.onnx --minShapes=point_coords:1x1x2,point_labels:1x1 --optShapes=point_coords:16x2x2,point_labels:16x2 --maxShapes=point_coords:16x2x2,point_labels:16x2 --fp16 --saveEngine=assets/export_models/sam/tensorrt/xl1_decoder.engine
 # TensorRT Inference
-python deployment/sam/tensorrt/inference.py --model l2 --encoder_engine assets/export_models/sam/tensorrt/l2_encoder.engine --decoder_engine assets/export_models/sam/tensorrt/l2_decoder.engine --mode point
+python deployment/sam/tensorrt/inference.py --model xl1 --encoder_engine assets/export_models/sam/tensorrt/xl1_encoder.engine --decoder_engine assets/export_models/sam/tensorrt/xl1_decoder.engine --mode point
 ```
 
 ## 算法部署（端侧）
@@ -34,15 +48,7 @@ docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DIS
 docker exec -it sbtracker-deploy /bin/bash
 ```
 ### 开放环境检测功能部署
-这一步一定要在台式机上(可以考虑使用`train.dockerfile`在run完的容器直接拿onnx)，我们需要在docker中默认准备好的一个训练好的自带pytorch模型作为范例,然后添加bbox decoder、NMS后转为ONNX模型。
-```sh
-cd /workspace/YOLOv8-TensorRT
-python3 export-det.py --weights yolov8s.pt --sim && \
-python3 export-det.py --weights yolov8s-oiv7.pt --sim && \
-python3 export-seg.py --weights yolov8s-seg.pt --sim && \
-yolo export model=yolov8s-pose.pt format=onnx simplify=True
-```
-下一步一定要在jetson本机上，使用TensorRT的python api来适配几个yolo模型
+这一步一定要在jetson本机上，使用TensorRT的python api来适配几个yolo模型
 ```sh
 cd /workspace/YOLOv8-TensorRT
 /usr/src/tensorrt/bin/trtexec --onnx=yolov8s.onnx --saveEngine=yolov8s.engine --fp16 && \
