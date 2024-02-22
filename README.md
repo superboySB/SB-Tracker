@@ -7,7 +7,7 @@
 
 ## 算法开发（云侧）
 ```sh
-docker build -f docker/train.dockerfile -t sbt_image:train . --progress=plain
+docker build -f docker/train.dockerfile -t sbt_image:train . --progress=plain --no-cache=false
 
 # 如果连接了摄像头硬件就可以加--device /dev/video0:/dev/video0 
 docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DISPLAY --runtime=nvidia --network=host --ipc host --name=sbtracker-train sbt_image:train /bin/bash
@@ -27,6 +27,11 @@ cd /workspace/YOLOv8-TensorRT
 /usr/src/tensorrt/bin/trtexec --onnx=yolov8s.onnx --saveEngine=yolov8s.engine --fp16 && \
 /usr/src/tensorrt/bin/trtexec --onnx=yolov8s-seg.onnx --saveEngine=yolov8s-seg.engine --fp16 && \
 /usr/src/tensorrt/bin/trtexec --onnx=yolov8s-pose.onnx --saveEngine=yolov8s-pose.engine --fp16
+```
+开始部署云侧优化的SiamMask算法(当前仅支持onnx，参考[博客](https://vjraj.dev/blog/siammask_onnx_export/))
+```sh
+cd /workspace/Siammask/
+python export.py && python main.py --model siammask_vot_simp.onnx
 ```
 开始部署云侧优化的ViT算法 (调试需要`--verbose`,xl1和l2模型的性价比详见[韩松团队介绍](https://github.com/mit-han-lab/efficientvit/blob/master/applications/sam.md))
 ```sh

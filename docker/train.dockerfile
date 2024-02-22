@@ -39,7 +39,7 @@ RUN cd YOLOv8-TensorRT && \
     python export-det.py --weights yolov8s.pt --sim && \
     python export-seg.py --weights yolov8s-seg.pt --sim && \
     yolo export model=yolov8s-pose.pt format=onnx simplify=True
-RUN python test_yoloworld.py
+RUN cd YOLOv8-TensorRT && python test_yoloworld.py
 
 # EfficientViT + SAM
 WORKDIR /workspace
@@ -52,6 +52,11 @@ RUN cd /workspace/efficientvit/ && mkdir -p assets/export_models/sam/tensorrt/ &
     python deployment/sam/onnx/export_decoder.py --model l2 --weight_url assets/checkpoints/sam/l2.pt --output assets/export_models/sam/onnx/l2_decoder.onnx --return-single-mask && \
     python deployment/sam/onnx/export_encoder.py --model xl1 --weight_url assets/checkpoints/sam/xl1.pt --output assets/export_models/sam/onnx/xl1_encoder.onnx && \ 
     python deployment/sam/onnx/export_decoder.py --model xl1 --weight_url assets/checkpoints/sam/xl1.pt --output assets/export_models/sam/onnx/xl1_decoder.onnx --return-single-mask
+
+# Siammask
+WORKDIR /workspace
+RUN git clone https://github.com/superboySB/SiamMask && cd SiamMask && pip install onnxoptimizer && bash make.sh
+
 
 
 WORKDIR /workspace
