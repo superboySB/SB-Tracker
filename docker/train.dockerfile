@@ -30,6 +30,7 @@ COPY docker/ros_entrypoint.sh /ros_entrypoint.sh
 WORKDIR /workspace
 RUN git clone https://github.com/superboySB/YOLOv8-TensorRT.git
 RUN cd YOLOv8-TensorRT && pip install --upgrade pip && pip install -r requirements.txt && \
+    pip install opencv-python==4.8.0.74 opencv-contrib-python==4.8.0.74 && \
     wget https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8s.pt && \
     wget https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8s-seg.pt && \
     wget https://github.com/ultralytics/assets/releases/download/v8.1.0/yolov8s-pose.pt && \
@@ -56,8 +57,6 @@ RUN cd /workspace/efficientvit/ && mkdir -p assets/export_models/sam/tensorrt/ &
 # Siammask
 WORKDIR /workspace
 RUN git clone https://github.com/superboySB/SiamMask && cd SiamMask && pip install onnxoptimizer && bash make.sh
-
-
 
 WORKDIR /workspace
 RUN rm -rf /var/lib/apt/lists/* && apt-get clean

@@ -4,10 +4,12 @@
 ## 当前进度
 有一些很明显要改进的点
 - [X] 显然可以用yolo的检测框来辅助给SAM画box，会比之前标point要准确很多，通过grounding dino+SAM+diffusion已经证明这样做有效。
+- [X] 不再是指定几十类的封闭集检测，改为开放集检测，并且没有明显损失原有性能，后面的tracking可以点击任意物体。
 
 ## 算法开发/云上服务（服务器侧）
 ```sh
-docker build -f docker/train.dockerfile -t sbt_image:train . --progress=plain --no-cache=false
+# --progress=plain --no-cache=false
+docker build -f docker/train.dockerfile -t sbt_image:train .
 
 # 如果连接了摄像头硬件就可以加--device /dev/video0:/dev/video0 
 docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DISPLAY --runtime=nvidia --network=host --ipc host --name=sbtracker-train sbt_image:train /bin/bash
@@ -35,7 +37,7 @@ python main.py --device_type=server --yolo_model_type=v8l --sam_model_type=xl1 -
 
 ## 算法部署/搞机测试（端侧）
 ```sh
-docker build -f docker/deploy.dockerfile -t sbt_image:deploy . --progress=plain
+docker build -f docker/deploy.dockerfile -t sbt_image:deploy .
 
 # 如果连接了摄像头硬件就可以加，确保摄像头安装:  ls /dev/video*
 docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DISPLAY --runtime=nvidia --device /dev/video0:/dev/video0 --device /dev/snd --device /dev/bus/usb --network=host --ipc host --name=sbtracker-deploy sbt_image:deploy /bin/bash
@@ -44,13 +46,13 @@ docker exec -it sbtracker-deploy /bin/bash
 ```
 开始部署端侧优化的SiamMask算法，原理同服务器侧
 ```sh
-cd /workspace/SiamMask/ && python export.py
+cd /workspace/SiamMask/ && python3 export.py
 ```
 考虑硬件通用性，ViT算法只转化为ONNX，这一步已经在dockerfile里面完成了，因此可以直接尝试运行jetson的指哪儿打哪儿代码
 ```sh
 cd /workspace && git clone https://github.com/superboySB/SB-Tracker && cd SB-Tracker
 
-python main.py --device_type=deployment --yolo_model_type=v8l --sam_model_type=l2 --class_names="red box,green pencil,white box"
+python3 main.py --device_type=deployment --yolo_model_type=v8l --sam_model_type=l2 --class_names="person,computer case,screen"
 ```
 ![](assets/demo.gif)
 
