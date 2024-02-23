@@ -60,4 +60,6 @@ RUN git clone https://github.com/superboySB/SiamMask && cd SiamMask && pip insta
 
 WORKDIR /workspace
 RUN rm -rf /var/lib/apt/lists/* && apt-get clean
+RUN chmod +x /ros_entrypoint.sh
+ENTRYPOINT ["/ros_entrypoint.sh"]
 CMD ["/bin/bash"]

@@ -46,13 +46,20 @@ docker exec -it sbtracker-deploy /bin/bash
 ```
 开始部署端侧优化的SiamMask算法，原理同服务器侧
 ```sh
-cd /workspace/SiamMask/ && python3 export.py
+cd /workspace/SiamMask/ && python export.py
 ```
-考虑硬件通用性，ViT算法只转化为ONNX，这一步已经在dockerfile里面完成了，因此可以直接尝试运行jetson的指哪儿打哪儿代码
+然后考虑硬件通用性，ViT算法的端侧部署只使用ONNX Optimizer，和服务器侧一样，下面ONNX这一步其实已经在dockerfile内部处理好了，可以跳过
 ```sh
-cd /workspace && git clone https://github.com/superboySB/SB-Tracker && cd SB-Tracker
-
-python3 main.py --device_type=deployment --yolo_model_type=v8l --sam_model_type=l2 --class_names="person,computer case,screen"
+cd /workspace/efficientvit/ && \
+python deployment/sam/onnx/export_encoder.py --model l2 --weight_url assets/checkpoints/sam/l2.pt --output assets/export_models/sam/onnx/l2_encoder.onnx && \ 
+python deployment/sam/onnx/export_decoder.py --model l2 --weight_url assets/checkpoints/sam/l2.pt --output assets/export_models/sam/onnx/l2_decoder.onnx --return-single-mask && \
+python deployment/sam/onnx/export_encoder.py --model xl1 --weight_url assets/checkpoints/sam/xl1.pt --output assets/export_models/sam/onnx/xl1_encoder.onnx && \ 
+python deployment/sam/onnx/export_decoder.py --model xl1 --weight_url assets/checkpoints/sam/xl1.pt --output assets/export_models/sam/onnx/xl1_decoder.onnx --return-single-mask && \
+python deployment/sam/onnx/inference.py --model l2 --encoder_model assets/export_models/sam/onnx/l2_encoder.onnx --decoder_model assets/export_models/sam/onnx/l2_decoder.onnx --mode point
+```
+现在可以直接尝试运行jetson的指哪儿打哪儿代码
+```sh
+python main.py --device_type=deployment --yolo_model_type=v8l --sam_model_type=l2 --class_names="person,computer case,screen"
 ```
 ![](assets/demo.gif)
 
