@@ -59,6 +59,10 @@ python deployment/sam/onnx/inference.py --model l2 --encoder_model assets/export
 ```
 现在可以直接尝试运行jetson的指哪儿打哪儿代码
 ```sh
+# git config --global --unset http.proxy
+
+cd /workspace && git clone https://github.com/superboySB/SB-Tracker && cd SB-Tracker
+
 python main.py --device_type=deployment --yolo_model_type=v8l --sam_model_type=l2 --class_names="person,computer case,screen"
 ```
 ![](assets/demo.gif)
