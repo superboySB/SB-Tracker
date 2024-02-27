@@ -10,7 +10,7 @@ WORKDIR /tmp
 SHELL ["/bin/bash", "-c"] 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends locales git tmux gedit vim openmpi-bin openmpi-common libopenmpi-dev libgl1-mesa-glx \
-    gcc zip curl htop libgl1 libglib2.0-0 libpython3-dev gnupg g++ libusb-1.0-0
+    gcc zip curl htop libgl1 libglib2.0-0 libpython3-dev gnupg g++ libusb-1.0-0 ffmpeg
 
 # ROS
 # RUN locale-gen en_US en_US.UTF-8 && update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8

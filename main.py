@@ -135,7 +135,7 @@ if __name__=="__main__":
         'device_type': args.device_type,
     }
     cv2.setMouseCallback("Webcam", click_event, params)
-    cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
+    cap = cv2.VideoCapture(0, cv2.CAP_V4L)
     cap.set(3, 640)
     cap.set(4, 480)
 
