@@ -1,6 +1,6 @@
 # SB-Tracker
 
-Language: [Chinese](./README.md) / [English](./README_zh.md)
+Language: [Chinese](./README_zh.md) / [English](./README.md)
 
 An open-environment UAV Tracker based on human-computer interaction, deployed on the Jetson Orin board (NX as an example), will first use yolo-world to detect object categories for the user (based on CLIP's open-set detection, categories can be specified by the user), and then the user can double-click the object they want to track with the mouse to start tracking immediately. Since the Segment Anything model on the edge is loaded, users can click on objects of a specified category or objects not in the detection box to attempt tracking, r to reset, q to quit. O(∩_∩)O
 

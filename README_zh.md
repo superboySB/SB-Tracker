@@ -1,6 +1,6 @@
 # SB-Tracker
 
-文档语言: [中文](./README.md) / [英文](./README_zh.md)
+文档语言: [中文](./README_zh.md) / [英文](./README.md)
 
 开放环境下基于人机交互的UAV Tracker，部署在Jetson Orin板载上(以NX)为例，会先用yolo-world给用户检测物体类别（基于CLIP的开集检测，类别可以自己给），然后用户用鼠标双击要跟踪的物体，即可即刻跟踪物体。由于加载了端侧的Segment Anything模型，用户既可以点击指定类别的物体，也可以点击不在检测框的物体，都可以尝试跟踪，`r`为重置，`q`为退出。O(∩_∩)O
 
