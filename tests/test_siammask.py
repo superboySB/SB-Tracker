@@ -35,7 +35,7 @@ if __name__ == "__main__":
     model = SiamMask(args.model)
 
     logger.info("Load in camera feed...")
-    cap = cv2.VideoCapture(args.cam_id)
+    cap = cv2.VideoCapture(args.cam_id, cv2.CAP_V4L)
     cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)

@@ -2,7 +2,7 @@
 
 Language: [Chinese](./README_zh.md) / [English](./README.md)
 
-An open-environment UAV Tracker based on human-computer interaction, deployed on the Jetson Orin board (NX as an example), will first use yolo-world to detect object categories for the user (based on CLIP's open-set detection, categories can be specified by the user), and then the user can double-click the object they want to track with the mouse to start tracking immediately. Since the Segment Anything model on the edge is loaded, users can click on objects of a specified category or objects not in the detection box to attempt tracking, r to reset, q to quit. O(∩_∩)O
+An open-environment UAV Tracker based on human-computer interaction, deployed on the Jetson Orin board (NX as an example), will first use yolo-world to detect object categories for the user (based on CLIP's open-set detection, categories can be specified by the user), and then the user can double-click the object they want to track with the mouse to start tracking immediately. Since the Segment Anything model on the edge is loaded, users can click on objects of a specified category or objects not in the detection box to attempt tracking, `r` to reset, `q` to quit. O(∩_∩)O
 
 ## Algorithm Development/Cloud Services (Server Side)
 ```sh
@@ -41,11 +41,7 @@ docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DIS
 
 docker exec -it sbtracker-deploy /bin/bash
 ```
-Begin deploying the edge-side optimized SiamMask algorithm, same principle as the server side
-```sh
-cd /workspace/SiamMask/ && python export.py
-```
-Then, considering hardware universality, the ViT algorithm's edge deployment uses only the ONNX Optimizer, similar to the server side, the ONNX step has actually been handled inside the dockerfile and can be skipped
+Then, considering hardware universality, the ViT algorithm's edge deployment uses only the ONNX Optimizer, different from using TensorRT on the server side
 ```sh
 cd /workspace/efficientvit/ && \
 python deployment/sam/onnx/export_encoder.py --model l2 --weight_url assets/checkpoints/sam/l2.pt --output assets/export_models/sam/onnx/l2_encoder.onnx && \ 

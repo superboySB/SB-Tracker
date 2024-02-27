@@ -42,11 +42,11 @@ docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DIS
 
 docker exec -it sbtracker-deploy /bin/bash
 ```
-开始部署端侧优化的SiamMask算法，原理同服务器侧
+开始部署端侧优化的NanoTrackV3算法，原理同服务器侧
 ```sh
-cd /workspace/SiamMask/ && python export.py
+cd /workspace/SiamTrackers/NanoTrack/ && mkdir models/onnx && python pytorch2onnx.py
 ```
-然后考虑硬件通用性，ViT算法的端侧部署只使用ONNX Optimizer，和服务器侧一样，下面ONNX这一步其实已经在dockerfile内部处理好了，可以跳过
+然后考虑硬件通用性，ViT算法的端侧部署也只使用ONNX Optimizer
 ```sh
 cd /workspace/efficientvit/ && \
 python deployment/sam/onnx/export_encoder.py --model l2 --weight_url assets/checkpoints/sam/l2.pt --output assets/export_models/sam/onnx/l2_encoder.onnx && \ 
