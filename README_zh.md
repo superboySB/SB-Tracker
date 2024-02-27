@@ -1,51 +1,52 @@
 # SB-Tracker
 
-Language: [Chinese](./README.md) / [English](./README_zh.md)
+文档语言: [中文](./README.md) / [英文](./README_zh.md)
 
-An open-environment UAV Tracker based on human-computer interaction, deployed on the Jetson Orin board (NX as an example), will first use yolo-world to detect object categories for the user (based on CLIP's open-set detection, categories can be specified by the user), and then the user can double-click the object they want to track with the mouse to start tracking immediately. Since the Segment Anything model on the edge is loaded, users can click on objects of a specified category or objects not in the detection box to attempt tracking, r to reset, q to quit. O(∩_∩)O
+开放环境下基于人机交互的UAV Tracker，部署在Jetson Orin板载上(以NX)为例，会先用yolo-world给用户检测物体类别（基于CLIP的开集检测，类别可以自己给），然后用户用鼠标双击要跟踪的物体，即可即刻跟踪物体。由于加载了端侧的Segment Anything模型，用户既可以点击指定类别的物体，也可以点击不在检测框的物体，都可以尝试跟踪，`r`为重置，`q`为退出。O(∩_∩)O
 
-## Algorithm Development/Cloud Services (Server Side)
+## 算法开发/云上服务（服务器侧）
 ```sh
 # --progress=plain --no-cache=false
 docker build -f docker/train.dockerfile -t sbt_image:train .
 
-# Add --device /dev/video0:/dev/video0 if a camera hardware is connected
+# 如果连接了摄像头硬件就可以加--device /dev/video0:/dev/video0 
 docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DISPLAY --runtime=nvidia --network=host --ipc host --name=sbtracker-train sbt_image:train /bin/bash
 
 docker exec -it sbtracker-train /bin/bash
 ```
-Begin deploying the server-side optimized [SiamMask](https://github.com/foolwood/SiamMask) algorithm (currently supports conversion to onnx, refer to the [blog]((https://vjraj.dev/blog/siammask_onnx_export/)))
+开始部署服务器侧优化的SiamMask算法(当前仅支持转为onnx，参考[博客](https://vjraj.dev/blog/siammask_onnx_export/))
 ```sh
 cd /workspace/SiamMask/ && python export.py
 ```
-Begin deploying the server-side optimized ViT algorithm (use `--verbose` for debugging, cost-effectiveness of xl1 and l2 models is detailed in [Han Song's team introduction]((https://github.com/mit-han-lab/efficientvit/blob/master/applications/sam.md)))
+开始部署服务器侧优化的ViT算法 (调试需要`--verbose`,xl1和l2模型的性价比详见[韩松团队介绍](https://github.com/mit-han-lab/efficientvit/blob/master/applications/sam.md))
 ```sh
 # Export Encoder and Decoder
 trtexec --onnx=assets/export_models/sam/onnx/xl1_encoder.onnx --minShapes=input_image:1x3x1024x1024 --optShapes=input_image:4x3x1024x1024 --maxShapes=input_image:4x3x1024x1024 --saveEngine=assets/export_models/sam/tensorrt/xl1_encoder.engine && \
 trtexec --onnx=assets/export_models/sam/onnx/xl1_decoder.onnx --minShapes=point_coords:1x1x2,point_labels:1x1 --optShapes=point_coords:16x2x2,point_labels:16x2 --maxShapes=point_coords:16x2x2,point_labels:16x2 --fp16 --saveEngine=assets/export_models/sam/tensorrt/xl1_decoder.engine
 ```
-Attempt to run the detect-and_track code on server device (or just a powerful laptop)
+尝试运行服务器的指哪儿打哪儿代码
 ```sh
 cd /workspace && git clone https://github.com/superboySB/SB-Tracker && cd SB-Tracker
 
 python main.py --device_type=server --yolo_model_type=v8l --sam_model_type=xl1 --class_names="red box,green pencil,white box"
 ```
-This includes an open-set detector, where you can define the categories of interest with `--class_names`
+这里包含一个开集检测器，可以自己定义感兴趣的类别`--class_names`
 
-## Algorithm Deployment/Real-Time Testing (Edge Side)
+
+## 算法部署/搞机测试（端侧）
 ```sh
 docker build -f docker/deploy.dockerfile -t sbt_image:deploy .
 
-# Add if a camera hardware is connected, make sure the camera is installed:  ls /dev/video*
+# 如果连接了摄像头硬件就可以加，确保摄像头安装:  ls /dev/video*
 docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DISPLAY --runtime=nvidia --device /dev/video0:/dev/video0 --device /dev/snd --device /dev/bus/usb --network=host --ipc host --name=sbtracker-deploy sbt_image:deploy /bin/bash
 
 docker exec -it sbtracker-deploy /bin/bash
 ```
-Begin deploying the edge-side optimized SiamMask algorithm, same principle as the server side
+开始部署端侧优化的SiamMask算法，原理同服务器侧
 ```sh
 cd /workspace/SiamMask/ && python export.py
 ```
-Then, considering hardware universality, the ViT algorithm's edge deployment uses only the ONNX Optimizer, similar to the server side, the ONNX step has actually been handled inside the dockerfile and can be skipped
+然后考虑硬件通用性，ViT算法的端侧部署只使用ONNX Optimizer，和服务器侧一样，下面ONNX这一步其实已经在dockerfile内部处理好了，可以跳过
 ```sh
 cd /workspace/efficientvit/ && \
 python deployment/sam/onnx/export_encoder.py --model l2 --weight_url assets/checkpoints/sam/l2.pt --output assets/export_models/sam/onnx/l2_encoder.onnx && \ 
@@ -54,7 +55,7 @@ python deployment/sam/onnx/export_encoder.py --model xl1 --weight_url assets/che
 python deployment/sam/onnx/export_decoder.py --model xl1 --weight_url assets/checkpoints/sam/xl1.pt --output assets/export_models/sam/onnx/xl1_decoder.onnx --return-single-mask && \
 python deployment/sam/onnx/inference.py --model l2 --encoder_model assets/export_models/sam/onnx/l2_encoder.onnx --decoder_model assets/export_models/sam/onnx/l2_decoder.onnx --mode point
 ```
-Attempt to run the detect-and_track code on edge device
+现在可以直接尝试运行jetson的指哪儿打哪儿代码
 ```sh
 # git config --global --unset http.proxy
 
@@ -62,9 +63,7 @@ cd /workspace && git clone https://github.com/superboySB/SB-Tracker && cd SB-Tra
 
 python main.py --device_type=deployment --yolo_model_type=v8l --sam_model_type=l2 --class_names="person,computer case,screen"
 ```
-This includes an open-set detector, where you can define the categories of interest with `--class_names`
 ![](assets/demo.gif)
-
 
 ## Acknowledgement
 The work was done when the author visited Qiyuan Lab, supervised by [Chao Wang](https://scholar.google.com/citations?user=qmDGt-kAAAAJ&hl=zh-CN).
