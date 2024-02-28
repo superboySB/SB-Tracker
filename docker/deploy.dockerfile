@@ -24,8 +24,6 @@ RUN cd efficientvit && \
     wget https://huggingface.co/han-cai/efficientvit-sam/resolve/main/l2.pt && \
     wget https://huggingface.co/han-cai/efficientvit-sam/resolve/main/xl1.pt
 RUN cd /workspace/efficientvit/ && pip install "opencv-python-headless<4.3" && \
-    python deployment/sam/onnx/export_encoder.py --model l0 --weight_url assets/checkpoints/sam/l0.pt --output assets/export_models/sam/onnx/l0_encoder.onnx && \ 
-    python deployment/sam/onnx/export_decoder.py --model l0 --weight_url assets/checkpoints/sam/l0.pt --output assets/export_models/sam/onnx/l0_decoder.onnx --return-single-mask && \
     python deployment/sam/onnx/export_encoder.py --model l2 --weight_url assets/checkpoints/sam/l2.pt --output assets/export_models/sam/onnx/l2_encoder.onnx && \ 
     python deployment/sam/onnx/export_decoder.py --model l2 --weight_url assets/checkpoints/sam/l2.pt --output assets/export_models/sam/onnx/l2_decoder.onnx --return-single-mask && \
     python deployment/sam/onnx/export_encoder.py --model xl1 --weight_url assets/checkpoints/sam/xl1.pt --output assets/export_models/sam/onnx/xl1_encoder.onnx && \ 

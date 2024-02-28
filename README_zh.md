@@ -50,22 +50,22 @@ docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DIS
 
 docker exec -it sbtracker-deploy /bin/bash
 ```
-开始部署端侧优化的NanoTrackV3算法，原理同服务器侧
+考虑硬件通用性（不一定都有GPU），ViT算法的端侧部署建议只使用ONNX Optimizer，所以主要运行下面的命令（已经在docker build阶段提前处理好）
+```sh
+cd /workspace/efficientvit/ && \
+python deployment/sam/onnx/export_encoder.py --model l2 --weight_url assets/checkpoints/sam/l2.pt --output assets/export_models/sam/onnx/l2_encoder.onnx && \ 
+python deployment/sam/onnx/export_decoder.py --model l2 --weight_url assets/checkpoints/sam/l2.pt --output assets/export_models/sam/onnx/l2_decoder.onnx --return-single-mask && \
+python deployment/sam/onnx/inference.py --model l2 --encoder_model assets/export_models/sam/onnx/l2_encoder.onnx --decoder_model assets/export_models/sam/onnx/l2_decoder.onnx --mode point
+```
+[正在开发中] 开始部署端侧优化后的NanoTrackV3算法，原理类似服务器侧的Siammask
 ```sh
 cd /workspace/SiamTrackers/NanoTrack/ && mkdir models/onnx && python pytorch2onnx.py
 ```
-然后考虑硬件通用性（不一定都有GPU），ViT算法的端侧部署建议只使用ONNX Optimizer，所以主要运行下面的命令（已经在docker build阶段提前处理好）
+[正在开发中] 如果一定需要用到tensorrt，可以运行和服务器侧`trtexec`一样的命令来准备相应的模型 （端侧需要支持最新版本的TensorRT和Jetpack 6）
 ```sh
-cd /workspace/efficientvit/ && \
-python deployment/sam/onnx/export_encoder.py --model l0 --weight_url assets/checkpoints/sam/l0.pt --output assets/export_models/sam/onnx/l0_encoder.onnx && \ 
-python deployment/sam/onnx/export_decoder.py --model l0 --weight_url assets/checkpoints/sam/l0.pt --output assets/export_models/sam/onnx/l0_decoder.onnx --return-single-mask && \
-python deployment/sam/onnx/inference.py --model l0 --encoder_model assets/export_models/sam/onnx/l0_encoder.onnx --decoder_model assets/export_models/sam/onnx/l0_decoder.onnx --mode point
-```
-[Optional] 如果一定需要用到tensorrt，可以运行和服务器侧`trtexec`一样的命令来准备相应的模型 （端侧需要支持最新版本的TensorRT和Jetpack 6）
-```sh
-/usr/src/tensorrt/bin/trtexec --onnx=assets/export_models/sam/onnx/l0_encoder.onnx --minShapes=input_image:1x3x512x512 --optShapes=input_image:4x3x512x512 --maxShapes=input_image:4x3x512x512 --saveEngine=assets/export_models/sam/tensorrt/l0_encoder.engine && \
-/usr/src/tensorrt/bin/trtexec --onnx=assets/export_models/sam/onnx/l0_decoder.onnx --minShapes=point_coords:1x1x2,point_labels:1x1 --optShapes=point_coords:16x2x2,point_labels:16x2 --maxShapes=point_coords:16x2x2,point_labels:16x2 --fp16 --saveEngine=assets/export_models/sam/tensorrt/l0_decoder.engine && \
-python deployment/sam/tensorrt/inference.py --model l0 --encoder_engine assets/export_models/sam/tensorrt/l0_encoder.engine --decoder_engine assets/export_models/sam/tensorrt/l0_decoder.engine --mode point
+/usr/src/tensorrt/bin/trtexec --onnx=assets/export_models/sam/onnx/l2_encoder.onnx --minShapes=input_image:1x3x512x512 --optShapes=input_image:4x3x512x512 --maxShapes=input_image:4x3x512x512 --saveEngine=assets/export_models/sam/tensorrt/l2_encoder.engine && \
+/usr/src/tensorrt/bin/trtexec --onnx=assets/export_models/sam/onnx/l2_decoder.onnx --minShapes=point_coords:1x1x2,point_labels:1x1 --optShapes=point_coords:16x2x2,point_labels:16x2 --maxShapes=point_coords:16x2x2,point_labels:16x2 --fp16 --saveEngine=assets/export_models/sam/tensorrt/l2_decoder.engine && \
+python deployment/sam/tensorrt/inference.py --model l2 --encoder_engine assets/export_models/sam/tensorrt/l2_encoder.engine --decoder_engine assets/export_models/sam/tensorrt/l2_decoder.engine --mode point
 ```
 现在可以直接尝试运行jetson的开放物体检测跟踪代码
 ```sh
@@ -73,7 +73,7 @@ python deployment/sam/tensorrt/inference.py --model l0 --encoder_engine assets/e
 
 cd /workspace && git clone https://github.com/superboySB/SB-Tracker && cd SB-Tracker
 
-python main.py --device_type=deployment --yolo_model_type=v8l --sam_model_type=l0 --class_names="person,computer case,black box"
+python main.py --device_type=deployment --yolo_model_type=v8l --sam_model_type=l2 --class_names="person,computer case,black box"
 ```
 这里包含一个开集检测器，可以自己定义感兴趣的类别`--class_names`
 
