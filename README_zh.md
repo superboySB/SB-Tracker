@@ -10,6 +10,7 @@
 - [X] 引入Siamese Network中的经典方法（SiamMask/NanoTrack）在不同条件的机器上做点击跟踪
 - [ ] 对所有模块引入TensorRT支持
 - [ ] 现在端侧tracking的推理没有实际用到生成的两个onnx，可以进一步转为onnx加速
+- [ ] 对接HITL仿真与飞控
 
 ## 算法开发/云上服务（服务器侧）
 ```sh
@@ -78,17 +79,6 @@ python main.py --device_type=deployment --yolo_model_type=v8l --sam_model_type=l
 这里包含一个开集检测器，可以自己定义感兴趣的类别`--class_names`
 
 ![](assets/demo.gif)
-
-## 对接HITL仿真与飞控（正在做）
-先单独做飞控固件的isaac ros节点
-```sh
-docker build -f docker/px4.dockerfile -t sbt_image:px4 .
-
-# 如果连接了摄像头硬件就可以加，确保摄像头安装:  ls /dev/video*
-docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DISPLAY --runtime=nvidia --device /dev/video0:/dev/video0 --device /dev/snd --device /dev/bus/usb --network=host --ipc host --name=mypx4 sbt_image:px4 /bin/bash
-
-docker exec -it sbtracker-px4 /bin/bash
-```
 
 ## Acknowledgement
 The work was done when the author visited Qiyuan Lab, supervised by [Chao Wang](https://scholar.google.com/citations?user=qmDGt-kAAAAJ&hl=zh-CN).

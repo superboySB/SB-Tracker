@@ -1,5 +1,5 @@
 # TODO： Need to be upgrade to r36.2 to support the latest tensorRT
-FROM dustynv/ros:humble-pytorch-l4t-r35.3.1
+FROM dustynv/ros:foxy-pytorch-l4t-r35.3.1
 
 # Please contact with me if you have problems
 LABEL maintainer="Zipeng Dai <daizipeng@bit.edu.cn>"
@@ -11,6 +11,24 @@ SHELL ["/bin/bash", "-c"]
 RUN apt-get update && \
     apt-get install -y --no-install-recommends locales git tmux gedit vim openmpi-bin openmpi-common libopenmpi-dev libgl1-mesa-glx \
     gcc zip curl htop libgl1 libglib2.0-0 libpython3-dev gnupg g++ libusb-1.0-0 ffmpeg
+
+# PX4 and relevant infra
+WORKDIR /workspace
+RUN git clone https://github.com/PX4/PX4-Autopilot.git -b v1.14.1 --recursive
+COPY docker/requirements.txt /workspace/PX4-Autopilot/requirements.txt
+COPY docker/ubuntu.sh /workspace/PX4-Autopilot/ubuntu.sh 
+RUN cd PX4-Autopilot/ && bash ubuntu.sh --no-nuttx && make clean
+RUN cd PX4-Autopilot/ && DONT_RUN=1 make px4_sitl_default gazebo-classic
+WORKDIR /workspace
+RUN . /opt/ros/foxy/install/setup.sh && git clone https://github.com/Jaeyoung-Lim/px4-offboard.git && cd px4-offboard && colcon build && cd ..
+RUN wget https://d176tv9ibo4jno.cloudfront.net/latest/QGroundControl.AppImage && chmod +x ./QGroundControl.AppImage 
+# RUN . /opt/ros/foxy/install/setup.sh && mkdir -p /workspace/px4_ros_com_ws/src && cd /workspace/px4_ros_com_ws/src && \
+#     git clone https://github.com/PX4/px4_msgs.git -b release/1.14 && cd .. && colcon build
+WORKDIR /workspace
+RUN . /opt/ros/foxy/install/setup.sh && mkdir microros_ws && cd microros_ws && \
+    git clone -b foxy https://github.com/micro-ROS/micro_ros_setup.git src/micro_ros_setup && \
+    rosdep update && rosdep install --from-paths src --ignore-src -y && colcon build && . install/local_setup.sh && \
+    ros2 run micro_ros_setup create_agent_ws.sh && ros2 run micro_ros_setup build_agent.sh
 
 # For our projects
 # EfficientViT + SAM
@@ -58,7 +76,6 @@ RUN cd SiamTrackers/NanoTrack && pip install yacs
 
 WORKDIR /workspace
 RUN rm -rf /var/lib/apt/lists/* && apt-get clean
-RUN chmod +x /opt/ros/humble/install/setup.bash
-# ENTRYPOINT ["/opt/ros/humble/install/setup.bash"]
+RUN chmod +x /opt/ros/foxy/install/setup.bash
 CMD ["/bin/bash"]
  
