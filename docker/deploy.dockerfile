@@ -20,7 +20,6 @@ RUN cd efficientvit && \
     pip install --upgrade pip wheel && \
     pip install git+https://github.com/superboySB/pytorch-image-models && \
     pip install --no-cache -r requirements.txt --constraint constraints.txt && mkdir -p assets/checkpoints/sam && cd assets/checkpoints/sam && \
-    wget https://huggingface.co/han-cai/efficientvit-sam/resolve/main/l0.pt && \
     wget https://huggingface.co/han-cai/efficientvit-sam/resolve/main/l2.pt && \
     wget https://huggingface.co/han-cai/efficientvit-sam/resolve/main/xl1.pt
 RUN cd /workspace/efficientvit/ && pip install "opencv-python-headless<4.3" && \

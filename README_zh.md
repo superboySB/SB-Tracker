@@ -2,7 +2,7 @@
 
 文档语言: [中文](./README_zh.md) / [英文](./README.md)
 
-开放环境下基于人机交互的UAV Tracker，部署在Jetson Orin板载上(以NX)为例，会先用yolo-world给用户检测物体类别（基于CLIP的开集检测，类别可以自己给），然后用户用鼠标双击要跟踪的物体，即可即刻跟踪物体。由于加载了端侧的Segment Anything模型，用户既可以点击指定类别的物体，也可以点击不在检测框的物体，都可以尝试跟踪，`r`为重置，`q`为退出。O(∩_∩)O
+开放环境下基于人机交互的UAV Tracker，部署在Jetson Orin板载上(以NX为例)，会先用yolo-world给用户检测物体类别（基于CLIP的开集检测，类别可以自己给），然后用户用鼠标点击要跟踪的物体，可以即刻跟踪物体。由于同时加载了端侧的Segment Anything模型，用户既可以点击指定类别框内的物体，也可以临时点击视野内没有标记检测框的任意物体，都可以尝试进行跟踪，`r`为重置，`q`为退出。
 
 ## 当前进度
 - [X] 引入CLIP做开集检测
@@ -85,11 +85,10 @@ python main.py --device_type=deployment --yolo_model_type=v8l --sam_model_type=l
 docker build -f docker/px4.dockerfile -t sbt_image:px4 .
 
 # 如果连接了摄像头硬件就可以加，确保摄像头安装:  ls /dev/video*
-docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DISPLAY --runtime=nvidia --device /dev/video0:/dev/video0 --device /dev/snd --device /dev/bus/usb --network=host --ipc host --name=sbtracker-deploy sbt_image:px4 /bin/bash
+docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DISPLAY --runtime=nvidia --device /dev/video0:/dev/video0 --device /dev/snd --device /dev/bus/usb --network=host --ipc host --name=mypx4 sbt_image:px4 /bin/bash
 
 docker exec -it sbtracker-px4 /bin/bash
 ```
-
 
 ## Acknowledgement
 The work was done when the author visited Qiyuan Lab, supervised by [Chao Wang](https://scholar.google.com/citations?user=qmDGt-kAAAAJ&hl=zh-CN).
