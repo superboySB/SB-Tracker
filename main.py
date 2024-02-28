@@ -1,5 +1,4 @@
 from ultralytics import YOLO
-from models.siammask import SiamMask
 
 import cv2
 import math
@@ -42,6 +41,7 @@ def click_event(event, x, y, flags, param):
                 if area < min_area:
                     min_area = area
                     selected_box = box
+                    
         if selected_box is None and device_type == "server":
             origin_image_size = latest_img.shape[:2]
             if sam_model_type == "xl1":
@@ -98,26 +98,42 @@ def click_event(event, x, y, flags, param):
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--device_type", type=str, required=True, help="server/deployment")
-    parser.add_argument("--yolo_model_type", type=str, required=True, help="v8l/v8s")
-    parser.add_argument("--sam_model_type", type=str, required=True, help="l2/xl1")
+    parser.add_argument("--device_type", type=str, default="deployment", help="server/deployment")
+    parser.add_argument("--yolo_model_type", type=str, default="v8l", help="v8s (small) / v8l (large)")
+    parser.add_argument("--sam_model_type", type=str, default="xl1",help="l0 (small) / l2 (middle) / xl1 (large)")
     parser.add_argument("--enter_to_track", action="store_true", help="是否点完了按回车才track，默认是点了就track")
-    parser.add_argument("--class_names", type=str, required=True, help="用逗号分隔的对象类名列表，例如 'person,car,dog'或'red box,green pencil,white box'")
+    parser.add_argument("--use_tensorrt", action="store_true", help="为了硬件的通用性，我们默认不使用tensorrt，使用ONNX Runtime;启动该标记视为使用tensorrt")
+    parser.add_argument("--class_names", type=str, default="person", help="用逗号分隔的对象类名列表，例如 'person,car,dog'或'red box,green pencil,white box'")
 
     args = parser.parse_args()
 
-    # 初始化YOLO模型
+    # 选择检测模型
     detect_model = YOLO(f"/workspace/YOLOv8-TensorRT/yolo{args.yolo_model_type}-world.pt")
-    track_model = SiamMask("/workspace/SiamMask/siammask_vot_simp.onnx")
-    if args.device_type == "server":
+    
+    # 选择分割模型
+    if args.use_tensorrt:
         from models.sam.tensorrt.inferencer import SAMDecoderInferencer, SAMEncoderInferencer
         from models.sam.tensorrt.inference import *
         sam_encoder = SAMEncoderInferencer(f"/workspace/efficientvit/assets/export_models/sam/tensorrt/{args.sam_model_type}_encoder.engine", batch_size=1)
         sam_decoder = SAMDecoderInferencer(f"/workspace/efficientvit/assets/export_models/sam/tensorrt/{args.sam_model_type}_decoder.engine", num=1, batch_size=1)
-    elif args.device_type == "deployment":
+    else:
         from models.sam.onnx.inference import *
         sam_encoder = SamEncoder(model_path=f"/workspace/efficientvit/assets/export_models/sam/onnx/{args.sam_model_type}_encoder.onnx")
         sam_decoder = SamDecoder(model_path=f"/workspace/efficientvit/assets/export_models/sam/onnx/{args.sam_model_type}_decoder.onnx")
+
+    # 选择跟踪模型
+    if args.device_type == "server":
+        from models.siammask import SiamMask
+        tracker = SiamMask("/workspace/SiamMask/siammask_vot_simp.onnx")
+    elif args.device_type == "deployment":
+        from models.nanotrack.core.config import cfg
+        from models.nanotrack.models.model_builder import ModelBuilder
+        from models.nanotrack.tracker.nano_tracker import NanoTracker
+        from models.nanotrack.utils.model_load import load_pretrain
+        cfg.merge_from_file("/workspace/SiamTrackers/NanoTrack/models/config/configv3.yaml")
+        cfg.CUDA = torch.cuda.is_available() and cfg.CUDA
+        track_model = load_pretrain(ModelBuilder(cfg), "/workspace/SiamTrackers/NanoTrack/models/pretrained/nanotrackv3.pth").cuda().eval()
+        tracker = NanoTracker(track_model, cfg)
     else:
         raise NotImplementedError
 
@@ -152,15 +168,24 @@ if __name__=="__main__":
         latest_img = img
         
         if track_initialized:
-            mask = track_model.forward(img)
-            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-            cnt_area = [cv2.contourArea(cnt) for cnt in contours]
+            if args.device_type == "server":
+                mask = tracker.forward(img)
+                contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+                cnt_area = [cv2.contourArea(cnt) for cnt in contours]
 
-            if len(contours) != 0 and np.max(cnt_area) > 100:
-                contour = contours[np.argmax(cnt_area)]  # use max area polygon
-                polygon = contour.reshape(-1, 2)
-                img[:, :, 2] = (mask > 0) * 255 + (mask == 0) * img[:, :, 2]
-                img = cv2.polylines(img, [polygon], True, (0,0,255), 3)
+                if len(contours) != 0 and np.max(cnt_area) > 100:
+                    contour = contours[np.argmax(cnt_area)]  # use max area polygon
+                    polygon = contour.reshape(-1, 2)
+                    img[:, :, 2] = (mask > 0) * 255 + (mask == 0) * img[:, :, 2]
+                    img = cv2.polylines(img, [polygon], True, (0,0,255), 3)
+            elif args.device_type == "deployment":
+                outputs = tracker.track(img)
+                bbox = list(map(int, outputs['bbox']))
+                cv2.rectangle(img, (bbox[0], bbox[1]),
+                                (bbox[0]+bbox[2], bbox[1]+bbox[3]),
+                                (0, 0, 255), 3)
+            else:
+                raise NotImplementedError
         else:
             results = detect_model.predict(img)
             boxes = results[0].boxes  # 获取检测结果
@@ -194,12 +219,11 @@ if __name__=="__main__":
             
             if selected_box and not args.enter_to_track:
                 # here do something with ROI points values (p1 and p2)
-                print("SiamMask Model set initialization")
                 x, y, w, h = selected_box[0], selected_box[1], selected_box[2] - selected_box[0], selected_box[3] - selected_box[1]
+                print("Tracker Model set initialization")
                 print(x, y, w, h)
-                track_model.init(img, (x,y,w,h))
                 track_initialized = True
-
+                tracker.init(img, (x, y, w, h))
 
         key = cv2.waitKey(1)
         if key == ord('q'):
