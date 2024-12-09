@@ -1,4 +1,4 @@
-# SB-Tracker (Realsense version)
+# SB-Tracker (Realsense D435i version)
 
 文档语言: [中文](./README_zh.md) / [英文](./README.md)
 
@@ -29,12 +29,9 @@ docker run -itd --privileged --name=sbtracker-train \
 --device /dev/video5:/dev/video5 \
 --device /dev/video6:/dev/video6 \
 --device /dev/video7:/dev/video7 \
---device /dev/video8:/dev/video8 \
---device /dev/video9:/dev/video9 \
 --device /dev/media2:/dev/media0 \
 --device /dev/media3:/dev/media1 \
 --device /dev/media2:/dev/media2 \
---device /dev/media3:/dev/media3 \
 --security-opt "device_cgroup_rule=c 81:* rmw" \
 --security-opt "device_cgroup_rule=c 189:* rmw" \
 sbt_image:train /bin/bash
