@@ -4,17 +4,25 @@ import numpy as np
 import torch
 import torchvision.transforms as T
 from torchvision.models.detection import fasterrcnn_resnet50_fpn
+from datetime import datetime
+import pytz
+import time
 
 # 初始化 RealSense
 pipeline = rs.pipeline()
 config = rs.config()
 
-# 配置低分辨率（424x240），并设置帧率为 90fps
+# 配置分辨率为 640x480，帧率为 30fps
 config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
 config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
 
-# 启动流
-pipeline.start(config)
+# 启动流并增加等待时间
+try:
+    pipeline.start(config)
+    print("RealSense camera started.")
+except RuntimeError as e:
+    print(f"Error starting RealSense camera: {e}")
+    exit(1)
 
 # 加载目标检测模型
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -42,11 +50,25 @@ def detect_objects(image):
     mask = (scores > 0.8) & (labels == COCO_CUP_CLASS_ID)
     return boxes[mask]
 
+def get_shanghai_time():
+    """获取当前上海时区的时间"""
+    tz = pytz.timezone('Asia/Shanghai')
+    return datetime.now(tz).strftime('%Y-%m-%d %H:%M:%S')
+
 def main():
+    frame_count = 0
+    start_time = time.time()
+    last_print_time = time.time()
+
     try:
         while True:
             # 获取图像帧
             frames = pipeline.wait_for_frames()
+
+            if not frames:
+                print("No frames received.")
+                continue
+
             color_frame = frames.get_color_frame()
             depth_frame = frames.get_depth_frame()
 
@@ -58,8 +80,13 @@ def main():
             depth_image = np.asanyarray(depth_frame.get_data())
             depth_intrinsics = depth_frame.profile.as_video_stream_profile().intrinsics
 
+            # 获取当前时间（上海时区）
+            current_time = get_shanghai_time()
+
             # 检测杯子
             boxes = detect_objects(color_image)
+
+            detected = False  # 用于判断是否检测到杯子
 
             for box in boxes:
                 # 获取检测框的中心点
@@ -74,8 +101,8 @@ def main():
                 # 将像素坐标转换为相机坐标系
                 point_camera = rs.rs2_deproject_pixel_to_point(depth_intrinsics, [u, v], depth)
 
-                # 打印相机坐标
-                print(f"Detected Cup at (Camera Frame): X={point_camera[0]:.2f}, "
+                # 打印相机坐标和时间
+                print(f"[{current_time}] Detected Cup at (Camera Frame): X={point_camera[0]:.2f}, "
                       f"Y={point_camera[1]:.2f}, Z={point_camera[2]:.2f}")
 
                 # 在图像上标注物体的检测框和相对位置
@@ -89,6 +116,22 @@ def main():
                     (255, 0, 0),
                     2
                 )
+
+                detected = True  # 标记已经检测到杯子
+
+            # 如果没有检测到杯子，输出missing
+            if not detected:
+                print(f"[{current_time}] Missing cup detection.")
+
+            # 计算帧率
+            frame_count += 1
+            current_time = time.time()
+
+            if current_time - last_print_time >= 1.0:
+                # 每秒打印30帧的数量
+                print(f"Frame rate: {frame_count} FPS")
+                frame_count = 0
+                last_print_time = current_time
 
             # 显示结果
             cv2.imshow('RealSense', color_image)
