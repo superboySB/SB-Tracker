@@ -1,4 +1,4 @@
-# SB-Tracker
+# SB-Tracker (Realsense version)
 
 文档语言: [中文](./README_zh.md) / [英文](./README.md)
 
@@ -17,8 +17,27 @@
 # --progress=plain --no-cache=false
 docker build -f docker/train.dockerfile -t sbt_image:train .
 
-# 如果连接了摄像头硬件就可以加--device /dev/video0:/dev/video0 
-docker run -itd --privileged -v /tmp/.X11-unix:/tmp/.X11-unix:ro -e DISPLAY=$DISPLAY --runtime=nvidia --network=host --ipc host --name=sbtracker-train sbt_image:train /bin/bash
+docker run -itd --privileged --name=sbtracker-train \
+--volume /tmp/.X11-unix:/tmp/.X11-unix \
+--env DISPLAY=$DISPLAY --env QT_X11_NO_MITSHM=1 \
+--runtime=nvidia --network=host \
+--device /dev/video0:/dev/video0 \
+--device /dev/video1:/dev/video1 \
+--device /dev/video2:/dev/video2 \
+--device /dev/video3:/dev/video3 \
+--device /dev/video4:/dev/video4 \
+--device /dev/video5:/dev/video5 \
+--device /dev/video6:/dev/video6 \
+--device /dev/video7:/dev/video7 \
+--device /dev/video8:/dev/video8 \
+--device /dev/video9:/dev/video9 \
+--device /dev/media2:/dev/media0 \
+--device /dev/media3:/dev/media1 \
+--device /dev/media2:/dev/media2 \
+--device /dev/media3:/dev/media3 \
+--security-opt "device_cgroup_rule=c 81:* rmw" \
+--security-opt "device_cgroup_rule=c 189:* rmw" \
+sbt_image:train /bin/bash
 
 docker exec -it sbtracker-train /bin/bash
 ```

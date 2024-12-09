@@ -2,6 +2,9 @@ FROM nvcr.io/nvidia/tensorrt:24.01-py3
 
 # Please contact with me if you have problems
 LABEL maintainer="Zipeng Dai <daizipeng@bit.edu.cn>"
+# TODO：网络不好的话可以走代理
+ENV http_proxy=http://127.0.0.1:8889
+ENV https_proxy=http://127.0.0.1:8889
 
 # System Requirements
 ARG ROS_PACKAGE=ros_base
@@ -61,5 +64,9 @@ RUN git clone https://github.com/superboySB/SiamMask && cd SiamMask && pip insta
 WORKDIR /workspace
 RUN rm -rf /var/lib/apt/lists/* && apt-get clean
 RUN chmod +x /ros_entrypoint.sh
+# TODO：如果走了代理、但是想镜像本地化到其它机器，记得清空代理（或者容器内unset）
+# ENV http_proxy=
+# ENV https_proxy=
+# ENV no_proxy=
 ENTRYPOINT ["/ros_entrypoint.sh"]
 CMD ["/bin/bash"]
