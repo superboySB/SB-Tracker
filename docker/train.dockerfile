@@ -3,8 +3,8 @@ FROM nvcr.io/nvidia/tensorrt:24.01-py3
 # Please contact with me if you have problems
 LABEL maintainer="Zipeng Dai <daizipeng@bit.edu.cn>"
 # TODO：网络不好的话可以走代理
-# ENV http_proxy=http://127.0.0.1:8889
-# ENV https_proxy=http://127.0.0.1:8889
+ENV http_proxy=http://127.0.0.1:8889
+ENV https_proxy=http://127.0.0.1:8889
 
 # System Requirements
 ARG ROS_PACKAGE=ros_base
