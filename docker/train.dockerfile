@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/tensorrt:24.01-py3
+FROM nvcr.io/nvidia/tensorrt:24.11-py3
 
 # Please contact with me if you have problems
 LABEL maintainer="Zipeng Dai <daizipeng@bit.edu.cn>"
@@ -45,7 +45,6 @@ RUN cd YOLOv8-TensorRT && \
     yolo export model=yolov8s-pose.pt format=onnx simplify=True
 RUN cd YOLOv8-TensorRT && python test_yoloworld.py
 
-
 # EfficientViT + SAM
 WORKDIR /workspace
 RUN git clone https://github.com/superboySB/efficientvit.git
@@ -61,6 +60,9 @@ RUN cd /workspace/efficientvit/ && mkdir -p assets/export_models/sam/tensorrt/ &
 # Siammask
 WORKDIR /workspace
 RUN git clone https://github.com/superboySB/SiamMask && cd SiamMask && pip install onnxoptimizer && bash make.sh
+
+# our project
+RUN pip install pyrealsense2
 
 WORKDIR /workspace
 RUN rm -rf /var/lib/apt/lists/* && apt-get clean
