@@ -19,8 +19,10 @@ docker build -f docker/train.dockerfile -t sbt_image:train --network=host --prog
 
 docker run -itd --privileged --name=sbtracker-train \
 --volume /tmp/.X11-unix:/tmp/.X11-unix \
---env DISPLAY=$DISPLAY --env QT_X11_NO_MITSHM=1 \
---runtime=nvidia --network=host \
+--env DISPLAY=$DISPLAY \
+--env QT_X11_NO_MITSHM=1 \
+--gpus all \
+--network=host \
 --device /dev/video0:/dev/video0 \
 --device /dev/video1:/dev/video1 \
 --device /dev/video2:/dev/video2 \
@@ -29,11 +31,9 @@ docker run -itd --privileged --name=sbtracker-train \
 --device /dev/video5:/dev/video5 \
 --device /dev/video6:/dev/video6 \
 --device /dev/video7:/dev/video7 \
---device /dev/media2:/dev/media0 \
---device /dev/media3:/dev/media1 \
+--device /dev/media0:/dev/media0 \
+--device /dev/media1:/dev/media1 \
 --device /dev/media2:/dev/media2 \
---security-opt "device_cgroup_rule=c 81:* rmw" \
---security-opt "device_cgroup_rule=c 189:* rmw" \
 sbt_image:train /bin/bash
 
 docker exec -it sbtracker-train /bin/bash
