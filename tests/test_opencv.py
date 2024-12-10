@@ -20,6 +20,11 @@ config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
 try:
     pipeline.start(config)
     print("RealSense camera started.")
+
+    # 获取深度传感器并关闭 Active IR
+    depth_sensor = pipeline.get_active_profile().get_device().first_depth_sensor()
+    depth_sensor.set_option(rs.option.emitter_enabled, 0)  # 关闭 IR 投影
+    print("Active IR (Emitter) has been disabled. Using Stereo Depth mode.")
 except RuntimeError as e:
     print(f"Error starting RealSense camera: {e}")
     exit(1)

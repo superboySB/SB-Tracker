@@ -14,8 +14,8 @@
 
 ## 算法开发/云上服务（服务器侧）
 ```sh
-# --progress=plain --no-cache=false
-docker build -f docker/train.dockerfile -t sbt_image:train .
+# --no-cache=false
+docker build -f docker/train.dockerfile -t sbt_image:train --network=host --progress=plain .
 
 docker run -itd --privileged --name=sbtracker-train \
 --volume /tmp/.X11-unix:/tmp/.X11-unix \

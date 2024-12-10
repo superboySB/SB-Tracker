@@ -108,7 +108,7 @@ if __name__=="__main__":
     args = parser.parse_args()
 
     # 选择检测模型
-    detect_model = YOLO(f"/workspace/YOLOv8-TensorRT/yolo{args.yolo_model_type}-world.pt")
+    detect_model = YOLO(f"/workspace/YOLOv8-TensorRT/yolo{args.yolo_model_type}-worldv2.pt")
     
     # 选择分割模型
     if args.use_tensorrt:
