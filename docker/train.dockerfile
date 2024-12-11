@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/tensorrt:24.10-py3
+FROM nvcr.io/nvidia/tensorrt:24.01-py3
 
 # Please contact with me if you have problems
 LABEL maintainer="Zipeng Dai <daizipeng@bit.edu.cn>"
@@ -59,7 +59,7 @@ RUN cd YOLOv8-TensorRT && python3 test_yoloworld.py
 
 # EfficientViT + SAM
 WORKDIR /workspace
-RUN git clone https://github.com/mit-han-lab/efficientvit.git
+RUN git clone https://github.com/superboySB/efficientvit
 RUN cd efficientvit && pip install -r requirements.txt && mkdir -p assets/checkpoints/efficientvit_sam && cd assets/checkpoints/efficientvit_sam && \
     wget https://huggingface.co/mit-han-lab/efficientvit-sam/resolve/main/efficientvit_sam_l2.pt && \
     wget https://huggingface.co/mit-han-lab/efficientvit-sam/resolve/main/efficientvit_sam_xl1.pt
