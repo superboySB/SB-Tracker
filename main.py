@@ -28,7 +28,6 @@ def click_event(event, x, y, flags, param):
     sam_encoder = param['sam_encoder']
     sam_decoder = param['sam_decoder']
     sam_model_type = param['sam_model_type']
-    device_type = param['device_type']
     
     if event == cv2.EVENT_LBUTTONDOWN:
         min_area = float('inf')
@@ -42,7 +41,7 @@ def click_event(event, x, y, flags, param):
                     min_area = area
                     selected_box = box
                     
-        if selected_box is None and device_type == "server":
+        if selected_box is None:
             origin_image_size = latest_img.shape[:2]
             if sam_model_type == "xl1":
                 img = preprocess(cv2.cvtColor(latest_img,cv2.COLOR_BGR2RGB), img_size=1024)
@@ -72,36 +71,11 @@ def click_event(event, x, y, flags, param):
             bbox = calculate_bounding_box(masks[0].squeeze().numpy())
             selected_box = bbox
 
-        if selected_box is None and device_type == "deployment":
-            origin_image_size = latest_img.shape[:2]
-            if sam_model_type == "xl1":
-                img = preprocess(cv2.cvtColor(latest_img,cv2.COLOR_BGR2RGB), img_size=1024)
-            elif sam_model_type == "l2":
-                img = preprocess(cv2.cvtColor(latest_img,cv2.COLOR_BGR2RGB), img_size=512)
-            else:
-                raise NotImplementedError
-            img_embeddings = sam_encoder(img)
-
-            point = np.array([[[x, y, 1]]], dtype=np.float32)
-            point_coords = point[..., :2]
-            point_labels = point[..., 2]
-
-            masks, _, _ = sam_decoder.run(
-                img_embeddings=img_embeddings,
-                origin_image_size=origin_image_size,
-                point_coords=point_coords,
-                point_labels=point_labels,
-            )
-            bbox = calculate_bounding_box(masks[0].squeeze().numpy())
-            selected_box = bbox
-
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--device_type", type=str, default="deployment", help="server/deployment")
     parser.add_argument("--yolo_model_type", type=str, default="v8l", help="v8s (small) / v8l (large)")
     parser.add_argument("--sam_model_type", type=str, default="xl1",help="l0 (small) / l2 (middle) / xl1 (large)")
-    parser.add_argument("--enter_to_track", action="store_true", help="是否点完了按回车才track，默认是点了就track")
     parser.add_argument("--use_tensorrt", action="store_true", help="为了硬件的通用性，我们默认不使用tensorrt，使用ONNX Runtime;启动该标记视为使用tensorrt")
     parser.add_argument("--class_names", type=str, default="person", help="用逗号分隔的对象类名列表，例如 'person,car,dog'或'red box,green pencil,white box'")
 
@@ -122,20 +96,8 @@ if __name__=="__main__":
         sam_decoder = SamDecoder(model_path=f"/workspace/efficientvit/assets/export_models/sam/onnx/{args.sam_model_type}_decoder.onnx")
 
     # 选择跟踪模型
-    if args.device_type == "server":
-        from models.siammask import SiamMask
-        tracker = SiamMask("/workspace/SiamMask/siammask_vot_simp.onnx")
-    elif args.device_type == "deployment":
-        from models.nanotrack.core.config import cfg
-        from models.nanotrack.models.model_builder import ModelBuilder
-        from models.nanotrack.tracker.nano_tracker import NanoTracker
-        from models.nanotrack.utils.model_load import load_pretrain
-        cfg.merge_from_file("/workspace/SiamTrackers/NanoTrack/models/config/configv3.yaml")
-        cfg.CUDA = torch.cuda.is_available() and cfg.CUDA
-        track_model = load_pretrain(ModelBuilder(cfg), "/workspace/SiamTrackers/NanoTrack/models/pretrained/nanotrackv3.pth").cuda().eval()
-        tracker = NanoTracker(track_model, cfg)
-    else:
-        raise NotImplementedError
+    from models.siammask import SiamMask
+    tracker = SiamMask("/workspace/SiamMask/siammask_vot_simp.onnx")
 
     # Define custom classes
     classNames = args.class_names.split(',')    
@@ -168,24 +130,15 @@ if __name__=="__main__":
         latest_img = img
         
         if track_initialized:
-            if args.device_type == "server":
-                mask = tracker.forward(img)
-                contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-                cnt_area = [cv2.contourArea(cnt) for cnt in contours]
+            mask = tracker.forward(img)
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+            cnt_area = [cv2.contourArea(cnt) for cnt in contours]
 
-                if len(contours) != 0 and np.max(cnt_area) > 100:
-                    contour = contours[np.argmax(cnt_area)]  # use max area polygon
-                    polygon = contour.reshape(-1, 2)
-                    img[:, :, 2] = (mask > 0) * 255 + (mask == 0) * img[:, :, 2]
-                    img = cv2.polylines(img, [polygon], True, (0,0,255), 3)
-            elif args.device_type == "deployment":
-                outputs = tracker.track(img)
-                bbox = list(map(int, outputs['bbox']))
-                cv2.rectangle(img, (bbox[0], bbox[1]),
-                                (bbox[0]+bbox[2], bbox[1]+bbox[3]),
-                                (0, 0, 255), 3)
-            else:
-                raise NotImplementedError
+            if len(contours) != 0 and np.max(cnt_area) > 100:
+                contour = contours[np.argmax(cnt_area)]  # use max area polygon
+                polygon = contour.reshape(-1, 2)
+                img[:, :, 2] = (mask > 0) * 255 + (mask == 0) * img[:, :, 2]
+                img = cv2.polylines(img, [polygon], True, (0,0,255), 3)
         else:
             results = detect_model.predict(img)
             boxes = results[0].boxes  # 获取检测结果
@@ -217,7 +170,7 @@ if __name__=="__main__":
                 cv2.rectangle(img, (selected_box[0], selected_box[1]), (selected_box[2], selected_box[3]), color, 3)
                 cv2.putText(img, "unknown", (selected_box[0], selected_box[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
             
-            if selected_box and not args.enter_to_track:
+            if selected_box:
                 # here do something with ROI points values (p1 and p2)
                 x, y, w, h = selected_box[0], selected_box[1], selected_box[2] - selected_box[0], selected_box[3] - selected_box[1]
                 print("Tracker Model set initialization")
@@ -231,13 +184,6 @@ if __name__=="__main__":
         elif key == ord('r'):
             selected_box = None  # 重置选中的框
             track_initialized = False
-        elif key in [13, 32] and selected_box and args.enter_to_track: # Pressed Enter or Space to use ROI
-            # here do something with ROI points values (p1 and p2)
-            print("SiamMask Model set initialization")
-            x, y, w, h = selected_box[0], selected_box[1], selected_box[2] - selected_box[0], selected_box[3] - selected_box[1]
-            print(x, y, w, h)
-            track_model.init(img, (x,y,w,h))
-            track_initialized = True
 
         cv2.imshow('Webcam', img)
 
