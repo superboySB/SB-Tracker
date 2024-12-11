@@ -51,7 +51,7 @@ python3 applications/efficientvit_sam/run_efficientvit_sam_trt.py --model effici
 ```
 尝试运行服务器的开放物体检测跟踪代码
 ```sh
-cd /workspace && git clone https://github.com/superboySB/SB-Tracker && cd SB-Tracker
+cd /workspace && git clone -b realsense https://github.com/superboySB/SB-Tracker && cd SB-Tracker
 
 python main.py --use_tensorrt --device_type=server --yolo_model_type=v8l --sam_model_type=xl1 --class_names="red box,green pencil,white box"
 ```
