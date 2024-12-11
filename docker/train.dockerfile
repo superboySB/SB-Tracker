@@ -23,8 +23,8 @@ WORKDIR /tmp
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     # python${PYTHON_VERSION} python${PYTHON_VERSION}-dev python3-pip libprotobuf-dev protobuf-compiler \
-    locales git tmux gedit vim openmpi-bin openmpi-common libopenmpi-dev libgl1 libglx-mesa0 \
-    libcanberra-gtk-module libcanberra-gtk3-module libusb-1.0-0 libusb-1.0-0-dev libglib2.0-0
+    locales git tmux gedit vim openmpi-bin openmpi-common libopenmpi-dev libgl1 libglx-mesa0 libsm6 libice6 \
+    libcanberra-gtk-module libcanberra-gtk3-module libusb-1.0-0 libusb-1.0-0-dev libglib2.0-0 
 # RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1
 
 # ONNX
