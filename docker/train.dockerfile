@@ -23,7 +23,7 @@ WORKDIR /tmp
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     # python${PYTHON_VERSION} python${PYTHON_VERSION}-dev python3-pip libprotobuf-dev protobuf-compiler \
-    locales git tmux gedit vim openmpi-bin openmpi-common libopenmpi-dev libgl1 libglx-mesa0
+    locales git tmux gedit vim openmpi-bin openmpi-common libopenmpi-dev libgl1 libglx-mesa0 libcanberra-gtk-module libcanberra-gtk3-module
 # RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1
 
 # ONNX
@@ -40,6 +40,10 @@ RUN apt-get update && \
 # RUN . ros2_build.sh
 # ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 # COPY docker/ros_entrypoint.sh /ros_entrypoint.sh
+
+# torch2trt
+WORKDIR /workspace
+RUN git clone https://github.com/NVIDIA-AI-IOT/torch2trt && cd torch2trt && python3 setup.py install
 
 # YOLOv8
 WORKDIR /workspace
