@@ -1,11 +1,9 @@
-import os
+import os 
 import onnxruntime as ort
 import numpy as np
 import cv2
 from pathlib import Path
 from loguru import logger
-import torch
-
 
 class SiamMask:
     def __init__(self, onnx_path:str, save_opt_onnxruntime:bool=True, do_profiling:bool=False) -> None:
@@ -48,36 +46,51 @@ class SiamMask:
         )
 
         # Extra stuff:
-        self.dummy_z_feat = np.zeros((1, 256, 7, 7))
+        self.dummy_z_feat = np.zeros((1, 256, 7, 7), dtype=np.float32)
         self.mask_color = (0, 0, 255)
+
+        # 预分配输入用的数组，减少重复创建
+        # 这些数组在 init 和 forward 时大小不变，只需更新值
+        self.target_pos0_array = np.zeros((2,), dtype=np.float32)
+        self.target_sz0_array = np.zeros((2,), dtype=np.float32)
+        self.scale_x_array = np.zeros((1,), dtype=np.float64)
+        self.z_features0_array = self.dummy_z_feat.copy()
+        self.first_time_array = np.zeros((1,), dtype=bool)
 
     def init(self, im: np.ndarray, coordinates: tuple) -> None:
         x, y, w, h = coordinates
 
         self.avg_chans = np.mean(im, axis=(0, 1))
-        target_pos0 = np.array([x + w / 2, y + h / 2])
-        target_sz0 = np.array([w, h])
+        target_pos0 = np.array([x + w / 2, y + h / 2], dtype=np.float32)
+        target_sz0 = np.array([w, h], dtype=np.float32)
 
         wc_z = target_sz0[0] + self.context_amount * sum(target_sz0)
         hc_z = target_sz0[1] + self.context_amount * sum(target_sz0)
         s_z = round(np.sqrt(wc_z * hc_z))
 
-        im1 = np.zeros((1, 3, self.instance_size, self.instance_size))
+        im1 = np.zeros((1, 3, self.instance_size, self.instance_size), dtype=np.float32)
         _im1 = self.__preprocess__(
             im, target_pos0, self.exemplar_size, s_z, self.avg_chans
         )
         im1[:, :, :127, :127] = _im1
 
+        # 更新输入数组，而不是每次都创建新数组
+        self.target_pos0_array[:] = target_pos0
+        self.target_sz0_array[:] = target_sz0
+        self.scale_x_array[0] = 100
+        self.z_features0_array[:] = self.dummy_z_feat
+        self.first_time_array[0] = True
+
         if self.do_profiling: self.t1.record()
         outputs = self.model.run(
             ["output", "target_pos1", "target_sz1", "z_features1", "delta_yx"],
             {
-                "im": np.array(im1,np.float32),
-                "target_pos0": np.array(target_pos0,np.float32),
-                "target_sz0": np.array(target_sz0,np.float32),
-                "scale_x": np.array(100, dtype=np.float64),
-                "z_features0": np.array(self.dummy_z_feat,np.float32),
-                "first_time": np.array(True),
+                "im": im1,
+                "target_pos0": self.target_pos0_array,
+                "target_sz0": self.target_sz0_array,
+                "scale_x": self.scale_x_array,
+                "z_features0": self.z_features0_array,
+                "first_time": self.first_time_array,
             },
         )
         if self.do_profiling:
@@ -95,7 +108,6 @@ class SiamMask:
             not self.avg_chans is None
         ), "All variables not initialized properly. Did you run init?"
 
-        #x, y, w, h = coordinates
         wc_x = self.target_sz[1] + self.context_amount * sum(self.target_sz)
         hc_x = self.target_sz[0] + self.context_amount * sum(self.target_sz)
         s_x = np.sqrt(wc_x * hc_x)
@@ -113,18 +125,25 @@ class SiamMask:
         im1 = self.__preprocess__(
             im, self.target_pos, self.instance_size, round(s_x), self.avg_chans
         )
-        im1 = np.expand_dims(im1, axis=0)
+        im1 = np.expand_dims(im1, axis=0)  # shape: (1, 3, 255, 255)
+
+        # 更新输入数组
+        self.target_pos0_array[:] = self.target_pos
+        self.target_sz0_array[:] = self.target_sz
+        self.scale_x_array[0] = scale_x
+        self.z_features0_array[:] = self.z_feature
+        self.first_time_array[0] = False
 
         if self.do_profiling: self.t1.record()
         outputs = self.model.run(
             ["output", "target_pos1", "target_sz1", "z_features1", "delta_yx"],
             {
-                "im": np.array(im1,np.float32),
-                "target_pos0": np.array(self.target_pos,np.float32),
-                "target_sz0": np.array(self.target_sz,np.float32),
-                "scale_x": np.array(scale_x, np.float64),
-                "z_features0": self.z_feature,
-                "first_time": np.array(False),
+                "im": im1,
+                "target_pos0": self.target_pos0_array,
+                "target_sz0": self.target_sz0_array,
+                "scale_x": self.scale_x_array,
+                "z_features0": self.z_features0_array,
+                "first_time": self.first_time_array,
             },
         )
         if self.do_profiling:
@@ -185,11 +204,10 @@ class SiamMask:
         context_ymin = context_ymin + top_pad
         context_ymax = context_ymax + top_pad
 
-        # zzp: a more easy speed version
         r, c, k = im.shape
         if any([top_pad, bottom_pad, left_pad, right_pad]):
             te_im = np.zeros(
-                (r + top_pad + bottom_pad, c + left_pad + right_pad, k), dtype=np.uint8
+                (r + top_pad + bottom_pad, c + left_pad + right_pad, k), dtype=im.dtype
             )
             te_im[top_pad : top_pad + r, left_pad : left_pad + c, :] = im
             if top_pad:
@@ -218,4 +236,7 @@ class SiamMask:
             im_patch = im_patch_original
 
         im_patch = np.transpose(im_patch, (2, 0, 1))  # C*H*W
+        # 确保数据为float32并连续，减少每次推理转换开销
+        im_patch = im_patch.astype(np.float32, copy=False)
+        im_patch = np.ascontiguousarray(im_patch)
         return im_patch
