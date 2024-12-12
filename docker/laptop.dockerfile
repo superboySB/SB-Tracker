@@ -42,10 +42,6 @@ RUN apt-get update && \
 # ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 # COPY docker/ros_entrypoint.sh /ros_entrypoint.sh
 
-# torch2trt
-WORKDIR /workspace
-RUN git clone https://github.com/NVIDIA-AI-IOT/torch2trt && cd torch2trt && python3 setup.py install
-
 # YOLOv8
 WORKDIR /workspace
 RUN git clone https://github.com/superboySB/YOLOv8-TensorRT.git
@@ -78,6 +74,10 @@ RUN cd /workspace/efficientvit/ && mkdir -p assets/export_models/efficientvit_sa
 WORKDIR /workspace
 RUN git clone https://github.com/superboySB/SiamMask && cd SiamMask && pip3 install onnxoptimizer && \
     bash make.sh
+
+# torch2trt
+WORKDIR /workspace
+RUN git clone https://github.com/NVIDIA-AI-IOT/torch2trt && cd torch2trt && python3 setup.py install
 
 # our project
 RUN pip3 install pyrealsense2
