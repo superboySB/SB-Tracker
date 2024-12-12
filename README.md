@@ -6,7 +6,7 @@
 - [X] 引入CLIP做开集检测
 - [X] 引入EfficientViT+SAM给未知物体画框
 - [X] 引入Siamese Network中的经典方法（SiamMask/NanoTrack）在不同条件的机器上做点击跟踪
-- [X] 对所有模块引入ONNX支持
+- [ ] 对所有模块引入ONNX支持
 - [ ] 对所有模块引入TensorRT支持
 - [ ] 对接HITL仿真与飞控
 

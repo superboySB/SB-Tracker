@@ -27,7 +27,7 @@ def show_bounding_box(ax, bbox, color='red', linewidth=2):
     ax.add_patch(plt.Rectangle((x_min, y_min), x_max-x_min, y_max-y_min, edgecolor=color, facecolor='none', linewidth=linewidth))
 
 def click_event(event, x, y, flags, param):
-    global selected_box, boxes_info,latest_img
+    global selected_box, boxes_info, latest_img
     sam_encoder = param['sam_encoder']
     sam_decoder = param['sam_decoder']
     sam_model_type = param['sam_model_type']
@@ -192,6 +192,42 @@ if __name__=="__main__":
                 polygon = contour.reshape(-1, 2)
                 img[:, :, 2] = (mask > 0) * 255 + (mask == 0) * img[:, :, 2]
                 img = cv2.polylines(img, [polygon], True, (0,0,255), 3)
+
+                # ------ 新增代码开始：利用mask计算物体的3D坐标 ------
+                mask_points = np.where(mask > 0)
+                depths = []
+                for i in range(len(mask_points[0])):
+                    py = mask_points[0][i]  # y坐标
+                    px = mask_points[1][i]  # x坐标
+                    d = depth_frame.get_distance(px, py)
+                    if d > 0 and d < 5.0:  # 筛选合理的深度值
+                        depths.append(d)
+
+                if len(depths) > 0:
+                    # 使用中值深度，提高对异常值的鲁棒性
+                    med_depth = np.median(depths)
+
+                    # 计算mask质心
+                    M = cv2.moments(mask.astype(np.uint8))
+                    if M['m00'] != 0:
+                        cx = int(M['m10']/M['m00'])
+                        cy = int(M['m01']/M['m00'])
+                        
+                        # 将像素坐标与深度转换为相机坐标系下的3D点
+                        point_camera = rs.rs2_deproject_pixel_to_point(depth_intrinsics, [cx, cy], float(med_depth))
+                        print(f"Tracked Object at (Camera Frame): X={point_camera[0]:.2f}, Y={point_camera[1]:.2f}, Z={point_camera[2]:.2f}")
+
+                        # 在图像上标注坐标
+                        cv2.putText(
+                            img,
+                            f"X={point_camera[0]:.2f}, Y={point_camera[1]:.2f}, Z={point_camera[2]:.2f}",
+                            (cx, cy),
+                            cv2.FONT_HERSHEY_SIMPLEX,
+                            0.5,
+                            (255, 0, 0),
+                            2
+                        )
+                # ------ 新增代码结束 ------
         else:
             results = detect_model.predict(img)
             boxes = results[0].boxes  # 获取检测结果
