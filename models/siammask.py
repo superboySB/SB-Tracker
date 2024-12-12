@@ -4,6 +4,7 @@ import numpy as np
 import cv2
 from pathlib import Path
 from loguru import logger
+import torch
 
 
 class SiamMask:
@@ -71,11 +72,11 @@ class SiamMask:
         outputs = self.model.run(
             ["output", "target_pos1", "target_sz1", "z_features1", "delta_yx"],
             {
-                "im": im1.astype(float),
-                "target_pos0": target_pos0.astype(float),
-                "target_sz0": target_sz0.astype(float),
+                "im": np.array(im1,np.float32),
+                "target_pos0": np.array(target_pos0,np.float32),
+                "target_sz0": np.array(target_sz0,np.float32),
                 "scale_x": np.array(100, dtype=np.float64),
-                "z_features0": self.dummy_z_feat.astype(float),
+                "z_features0": np.array(self.dummy_z_feat,np.float32),
                 "first_time": np.array(True),
             },
         )
@@ -118,10 +119,10 @@ class SiamMask:
         outputs = self.model.run(
             ["output", "target_pos1", "target_sz1", "z_features1", "delta_yx"],
             {
-                "im": im1.astype(float),
-                "target_pos0": self.target_pos.astype(float),
-                "target_sz0": self.target_sz.astype(float),
-                "scale_x": np.array(scale_x, dtype=np.float64),
+                "im": np.array(im1,np.float32),
+                "target_pos0": np.array(self.target_pos,np.float32),
+                "target_sz0": np.array(self.target_sz,np.float32),
+                "scale_x": np.array(scale_x, np.float64),
                 "z_features0": self.z_feature,
                 "first_time": np.array(False),
             },
@@ -152,7 +153,7 @@ class SiamMask:
         b = (im.shape[0] - 1) / back_box[3]
         c = -a * back_box[0]
         d = -b * back_box[1]
-        mapping = np.array([[a, 0, c], [0, b, d]]).astype(float)
+        mapping = np.array([[a, 0, c], [0, b, d]], dtype=np.float32)
         crop = cv2.warpAffine(
             mask,
             mapping,
@@ -161,7 +162,7 @@ class SiamMask:
             borderMode=cv2.BORDER_CONSTANT,
             borderValue=-1,
         )
-        target_mask = (crop > self.segmentation_thres).astype(int)
+        target_mask = (crop > self.segmentation_thres).astype(np.uint8)
         return target_mask
 
     def __preprocess__(self, im, pos, model_sz, original_sz, avg_chans) -> np.ndarray:

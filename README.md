@@ -6,6 +6,7 @@
 - [X] 引入CLIP做开集检测
 - [X] 引入EfficientViT+SAM给未知物体画框
 - [X] 引入Siamese Network中的经典方法（SiamMask/NanoTrack）在不同条件的机器上做点击跟踪
+- [X] 对所有模块引入ONNX支持
 - [ ] 对所有模块引入TensorRT支持
 - [ ] 对接HITL仿真与飞控
 
@@ -37,7 +38,7 @@ docker exec -it sbtracker-train /bin/bash
 ```
 开始部署服务器侧优化的SiamMask算法(当前仅支持转为onnx，参考[博客](https://vjraj.dev/blog/siammask_onnx_export/))
 ```sh
-cd /workspace/SiamMask/ && python export.py
+cd /workspace/SiamMask/ && python3 export.py
 ```
 开始部署服务器侧优化的ViT算法 (调试需要`--verbose`,xl1和l2模型的性价比详见[韩松团队介绍](https://github.com/mit-han-lab/efficientvit/tree/master/applications/efficientvit_sam))
 ```sh
@@ -50,7 +51,7 @@ python3 applications/efficientvit_sam/run_efficientvit_sam_trt.py --model effici
 ```sh
 cd /workspace && git clone -b realsense https://github.com/superboySB/SB-Tracker && cd SB-Tracker
 
-python main.py --use_tensorrt --yolo_model_type=v8l --sam_model_type=xl1 --class_names="nlue bottle, white cup"
+python3 main.py --use_tensorrt --yolo_model_type=v8l --sam_model_type=xl1 --class_names="blue bottle, white cup"
 ```
 这里包含一个开集检测器，可以自己定义感兴趣的类别`--class_names`
 
