@@ -50,7 +50,7 @@ python3 applications/efficientvit_sam/run_efficientvit_sam_trt.py --model effici
 ```sh
 cd /workspace && git clone -b realsense https://github.com/superboySB/SB-Tracker && cd SB-Tracker
 
-python main.py --use_tensorrt --yolo_model_type=v8l --sam_model_type=xl1 --class_names="orange bottle,hand"
+python main.py --use_tensorrt --yolo_model_type=v8l --sam_model_type=xl1 --class_names="nlue bottle, white cup"
 ```
 这里包含一个开集检测器，可以自己定义感兴趣的类别`--class_names`
 
