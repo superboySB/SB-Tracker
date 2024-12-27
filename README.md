@@ -1,14 +1,8 @@
-# SB-Tracker (Realsense D435i version)
+# SB-Tracker (Offline version)
 
 开放环境下基于人机交互的UAV Tracker，部署在Jetson Orin板载上(以NX为例)，会先用yolo-world给用户检测物体类别（基于CLIP的开集检测，类别可以自己给），然后用户用鼠标点击要跟踪的物体，可以即刻跟踪物体。由于同时加载了端侧的Segment Anything模型，用户既可以点击指定类别框内的物体，也可以临时点击视野内没有标记检测框的任意物体，都可以尝试进行跟踪，`r`为重置，`q`为退出。
 
-## 当前进度
-- [X] 引入CLIP做开集检测
-- [X] 引入EfficientViT+SAM给未知物体画框
-- [X] 引入Siamese Network中的经典方法（SiamMask/NanoTrack）在不同条件的机器上做点击跟踪
-- [ ] 对所有模块引入ONNX支持
-- [ ] 对所有模块引入TensorRT支持
-- [ ] 对接HITL仿真与飞控
+当前这个版本主要是用给定的mp4视频对指定的一个气球做跟踪，笔记本算力负载，出一个能持续tracking的demo
 
 ## 在笔记本电脑上测试
 ```sh
@@ -36,7 +30,7 @@ sbt_image:train /bin/bash
 
 docker exec -it sbtracker-train /bin/bash
 ```
-开始部署服务器侧优化的SiamMask算法(当前仅支持转为onnx，参考[博客](https://vjraj.dev/blog/siammask_onnx_export/))
+开始部署侧优化的SiamMask算法(当前仅支持转为onnx，参考[博客](https://vjraj.dev/blog/siammask_onnx_export/))
 ```sh
 cd /workspace/SiamMask/ && python3 export.py
 ```
