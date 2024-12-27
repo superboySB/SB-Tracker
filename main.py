@@ -3,12 +3,13 @@ import cv2
 import math
 import numpy as np
 import argparse
-import matplotlib.pyplot as plt
-from utils import *
-import torch
-import tensorrt as trt
-from torch2trt import TRTModule
 from models.siammask import SiamMask
+import torch
+
+# Global variables for drawing
+drawing = False  # True if mouse is pressed
+ix, iy = -1, -1
+selected_box_manual = None  # Manually selected box
 
 def calculate_bounding_box(mask):
     """
@@ -23,122 +24,72 @@ def calculate_bounding_box(mask):
     y_max = np.max(pos[0])
     return x_min, y_min, x_max, y_max
 
-def show_bounding_box(ax, bbox, color='red', linewidth=2):
-    """
-    Display the bounding box on the image.
-    """
-    if bbox is None:
-        return
-    x_min, y_min, x_max, y_max = bbox
-    ax.add_patch(plt.Rectangle((x_min, y_min), x_max-x_min, y_max-y_min, edgecolor=color, facecolor='none', linewidth=linewidth))
-
 def click_event(event, x, y, flags, param):
-    global selected_box, boxes_info, latest_img, track_initialized
-    sam_encoder = param['sam_encoder']
-    sam_decoder = param['sam_decoder']
-    sam_model_type = param['sam_model_type']
+    global selected_box, boxes_info, latest_img, track_initialized, drawing, ix, iy, selected_box_manual
     detect_model = param['detect_model']
     classNames = param['classNames']
     tracker = param['tracker']
     output_writer = param['output_writer']
-    
-    if event == cv2.EVENT_LBUTTONDOWN and not track_initialized:
-        min_area = float('inf')
-        selected_box_candidate = None
-        for info in boxes_info:
-            box = info['box']
-            x1, y1, x2, y2 = box
-            if x1 < x < x2 and y1 < y < y2:
-                area = (x2 - x1) * (y2 - y1)
-                if area < min_area:
-                    min_area = area
-                    selected_box_candidate = box
-        
-        if selected_box_candidate is not None:
-            # 初始化跟踪器
-            x, y, w, h = selected_box_candidate[0], selected_box_candidate[1], selected_box_candidate[2] - selected_box_candidate[0], selected_box_candidate[3] - selected_box_candidate[1]
-            print("Tracker Model set initialization with selected box")
-            print(x, y, w, h)
-            tracker.init(latest_img, (x, y, w, h))
-            selected_box = selected_box_candidate
-            track_initialized = True
-            print("Tracking initialized with selected bounding box.")
-            return  # Exit after initializing
-        
-        else:
-            # 使用SAM进行分割
-            origin_image_size = latest_img.shape[:2]
-            if sam_model_type == "xl1":
-                img_preprocessed = preprocess(cv2.cvtColor(latest_img, cv2.COLOR_BGR2RGB), img_size=1024, device="cuda")
-            elif sam_model_type == "l2":
-                img_preprocessed = preprocess(cv2.cvtColor(latest_img, cv2.COLOR_BGR2RGB), img_size=512, device="cuda")
-            else:
-                raise NotImplementedError("Unsupported SAM model type.")
-            
-            image_embedding = sam_encoder(img_preprocessed)
-            image_embedding = image_embedding[0].reshape(1, 256, 64, 64)
+    frame_display = param['frame_display']
 
-            input_size = get_preprocess_shape(*origin_image_size, long_side_length=1024)
-
-            point = np.array([[[x, y, 1]]], dtype=np.float32)
-            point_coords = point[..., :2]
-            point_labels = point[..., 2]
-            point_coords = apply_coords(point_coords, origin_image_size, input_size).astype(np.float32)
-
-            inputs = (image_embedding, torch.from_numpy(point_coords).to("cuda"), torch.from_numpy(point_labels).to("cuda"))
-            assert all([x.dtype == torch.float32 for x in inputs])
-
-            low_res_masks, _ = sam_decoder(*inputs)
-            low_res_masks = low_res_masks.reshape(1, 1, 256, 256)
-
-            masks = mask_postprocessing(low_res_masks, origin_image_size)
-            masks = masks > 0.0
-
-            bbox = calculate_bounding_box(masks[0].squeeze().cpu().numpy())
-            if bbox is not None:
-                selected_box = bbox
-                x, y, w, h = selected_box[0], selected_box[1], selected_box[2] - selected_box[0], selected_box[3] - selected_box[1]
-                print("Tracker Model set initialization with SAM-generated box")
+    if event == cv2.EVENT_LBUTTONDOWN:
+        if len(boxes_info) > 0:
+            # Check if click is inside any detection box
+            min_area = float('inf')
+            selected_box_candidate = None
+            for info in boxes_info:
+                box = info['box']
+                x1, y1, x2, y2 = box
+                if x1 < x < x2 and y1 < y < y2:
+                    area = (x2 - x1) * (y2 - y1)
+                    if area < min_area:
+                        min_area = area
+                        selected_box_candidate = box
+            if selected_box_candidate is not None:
+                # Initialize tracker with selected detection box
+                x, y, w, h = selected_box_candidate[0], selected_box_candidate[1], selected_box_candidate[2] - selected_box_candidate[0], selected_box_candidate[3] - selected_box_candidate[1]
+                print("Tracker Model set initialization with selected box")
                 print(x, y, w, h)
                 tracker.init(latest_img, (x, y, w, h))
+                selected_box = selected_box_candidate
                 track_initialized = True
-                print("Tracking initialized with SAM-generated bounding box.")
-            else:
-                print("SAM could not generate a valid mask for the clicked point.")
+                print("Tracking initialized with selected bounding box.")
+                return  # Exit after initializing
+        else:
+            # No detection boxes, start drawing manually
+            drawing = True
+            ix, iy = x, y
+
+    elif event == cv2.EVENT_MOUSEMOVE:
+        if drawing:
+            # Update the rectangle being drawn
+            frame_display[:] = latest_img.copy()
+            cv2.rectangle(frame_display, (ix, iy), (x, y), (255, 0, 0), 2)
+            cv2.imshow('Video', frame_display)
+
+    elif event == cv2.EVENT_LBUTTONUP:
+        if drawing:
+            drawing = False
+            selected_box_manual = (min(ix, x), min(iy, y), max(ix, x), max(iy, y))
+            print(f"Manual selection box: {selected_box_manual}")
+            # Initialize tracker with manually drawn box
+            x1, y1, x2, y2 = selected_box_manual
+            w = x2 - x1
+            h = y2 - y1
+            tracker.init(latest_img, (x1, y1, w, h))
+            selected_box = selected_box_manual
+            track_initialized = True
+            print("Tracking initialized with manually selected bounding box.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--yolo_model_type", type=str, default="v8l", help="v8s (small) / v8l (large)")
-    parser.add_argument("--sam_model_type", type=str, default="xl1", help="l0 (small) / l2 (middle) / xl1 (large)")
     parser.add_argument("--class_names", type=str, default="person", help="用逗号分隔的对象类名列表，例如 'person,car,dog'或'red box,green pencil,white box'")
     args = parser.parse_args()
-
-    # 默认使用TensorRT
-    use_tensorrt = True
 
     # 选择检测模型
     detect_model = YOLO(f"/workspace/YOLOv8-TensorRT/yolo{args.yolo_model_type}-worldv2.pt")
     
-    # 选择分割模型 (SAM) 使用TensorRT
-    if use_tensorrt:
-        with trt.Logger() as logger, trt.Runtime(logger) as runtime:
-            with open(f"/workspace/efficientvit/assets/export_models/efficientvit_sam/tensorrt/efficientvit_sam_{args.sam_model_type}_encoder.engine", "rb") as f:
-                engine_bytes = f.read()
-            engine = runtime.deserialize_cuda_engine(engine_bytes)
-        trt_encoder = TRTModule(engine, input_names=["input_image"], output_names=["image_embeddings"])
-
-        with trt.Logger() as logger, trt.Runtime(logger) as runtime:
-            with open(f"/workspace/efficientvit/assets/export_models/efficientvit_sam/tensorrt/efficientvit_sam_{args.sam_model_type}_decoder.engine", "rb") as f:
-                engine_bytes = f.read()
-            engine = runtime.deserialize_cuda_engine(engine_bytes)
-        trt_decoder = TRTModule(
-            engine,
-            input_names=["image_embeddings", "point_coords", "point_labels"],
-            output_names=["masks", "iou_predictions"],
-        )
-    else:
-        raise NotImplementedError("Only TensorRT is supported in the current implementation.")
-
     # 选择跟踪模型
     tracker = SiamMask("/workspace/SiamMask/siammask_vot_simp.onnx")
 
@@ -171,6 +122,7 @@ if __name__ == "__main__":
         exit(1)
     
     latest_img = first_frame.copy()
+    frame_display = latest_img.copy()
 
     # 进行YOLO检测
     results = detect_model.predict(latest_img)
@@ -196,20 +148,22 @@ if __name__ == "__main__":
     # 如果没有检测到指定类别的物体，则不显示任何框
     if len(boxes_info) == 0:
         latest_img = first_frame.copy()
-        print("当前帧没有检测到指定类别的物体。")
-    
+        frame_display = latest_img.copy()
+        print("当前帧没有检测到指定类别的物体。您可以手动拖拽选择一个框来初始化跟踪。")
+    else:
+        frame_display = latest_img.copy()
+        print("显示第一帧，请点击选择要跟踪的物体。")
+
     # 显示第一帧并等待用户交互
-    cv2.namedWindow("Video", cv2.WINDOW_AUTOSIZE)
+    cv2.namedWindow("Video", cv2.WINDOW_NORMAL)
     
     # 创建包含所需变量的字典
     params = {
-        'sam_encoder': trt_encoder,
-        'sam_decoder': trt_decoder,
-        'sam_model_type': args.sam_model_type,
         'detect_model': detect_model,
         'classNames': classNames,
         'tracker': tracker,
         'output_writer': output_writer,
+        'frame_display': frame_display,
     }
     cv2.setMouseCallback("Video", click_event, params)
     
@@ -217,9 +171,9 @@ if __name__ == "__main__":
     track_initialized = False
 
     print("显示第一帧，请点击选择要跟踪的物体。")
-
+    
     while True:
-        cv2.imshow('Video', latest_img)
+        cv2.imshow('Video', frame_display)
         key = cv2.waitKey(1) & 0xFF
         if track_initialized:
             break
@@ -243,12 +197,16 @@ if __name__ == "__main__":
                     cv2.rectangle(latest_img, (x1, y1), (x2, y2), color, 3)
                     label = f"{classNames[cls]} {conf}"
                     cv2.putText(latest_img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
-            cv2.imshow('Video', latest_img)
-            print("已重置，请再次点击选择要跟踪的物体。")
-
+            frame_display = latest_img.copy()
+            cv2.imshow('Video', frame_display)
+            if len(boxes_info) > 0:
+                print("已重置，请再次点击选择要跟踪的物体。")
+            else:
+                print("已重置，请手动拖拽选择要跟踪的物体。")
+    
     # 初始化输出视频写入器
     output_writer.write(first_frame)
-
+    
     # 开始跟踪
     frame_idx = 1  # 已处理第一帧
     print("开始跟踪视频...")
