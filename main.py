@@ -31,7 +31,7 @@ def click_event(event, x, y, flags, param):
     tracker = param['tracker']
     output_writer = param['output_writer']
     scale_factor = param['scale_factor']
-    
+
     if tracking_failed:
         # 跟踪已失败，不再处理点击事件
         return
@@ -124,8 +124,9 @@ if __name__ == "__main__":
     total_frames = int(video_cap.get(cv2.CAP_PROP_FRAME_COUNT))
     
     # 设置输出视频
-    output_path = video_path.rsplit('.', 1)[0] + "_results.mp4"
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    # 使用 'XVID' 编码器，它通常比 'mp4v' 更快且更少卡顿
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    output_path = video_path.rsplit('.', 1)[0] + "_results.avi"  # 改为 .avi 格式
     output_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
     
     # 读取第一帧
@@ -150,20 +151,20 @@ if __name__ == "__main__":
         
         # 设置颜色和文本
         color = (0, 255, 0)  # 绿色
-        cv2.rectangle(latest_img, (x1, y1), (x2, y2), color, 3)
+        cv2.rectangle(latest_img, (x1, y1), (x2, y2), color, 2)
         label = f"{classNames[cls]} {conf}"
-        cv2.putText(latest_img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+        cv2.putText(latest_img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
         
         # 打印日志
         print(f"Class name --> {classNames[cls]}, Confidence ---> {conf}")
 
-    # 如果没有检测到指定类别的物体，则不显示任何框
+    # 如果没有检测到指定类别的物体，则通知用户手动选择框
     if len(boxes_info) == 0:
         print("当前帧没有检测到指定类别的物体。您可以手动拖拽选择一个框来初始化跟踪。")
     else:
         print("显示第一帧，请点击选择要跟踪的物体。")
-    
-    # Resize factor
+
+    # 缩放因子
     scale_factor = 0.5  # 缩放为原始尺寸的二分之一
     width_resized = int(width * scale_factor)
     height_resized = int(height * scale_factor)
@@ -178,8 +179,9 @@ if __name__ == "__main__":
     tracking_failed = False
     show_masks = True
 
-    # 显示第一帧并等待用户交互
-    cv2.namedWindow("Video", cv2.WINDOW_AUTOSIZE)
+    # 创建显示窗口
+    cv2.namedWindow("Video", cv2.WINDOW_NORMAL)
+    cv2.resizeWindow("Video", width_resized, height_resized)
     
     # 创建包含所需变量的字典
     params = {
@@ -194,6 +196,7 @@ if __name__ == "__main__":
     print("显示第一帧，请点击选择要跟踪的物体。")
     
     while True:
+        # 显示缩放后的帧供用户交互
         cv2.imshow('Video', frame_display)
         key = cv2.waitKey(1) & 0xFF
         if track_initialized:
@@ -209,12 +212,17 @@ if __name__ == "__main__":
             track_initialized = False
             tracking_failed = False
             show_masks = True
-            # 重新显示第一帧
+            # 重新读取第一帧
+            video_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ret, first_frame = video_cap.read()
+            if not ret:
+                print("无法读取视频的第一帧。")
+                exit(1)
             latest_img = first_frame.copy()
             # 重新进行YOLO检测
             results = detect_model.predict(latest_img)
             boxes = results[0].boxes  # 获取检测结果
-            boxes_info = []  # 用于存储框的信息
+            boxes_info = []  # 清空上一帧的信息
 
             for box in boxes:
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
@@ -225,14 +233,14 @@ if __name__ == "__main__":
                 
                 # 设置颜色和文本
                 color = (0, 255, 0)  # 绿色
-                cv2.rectangle(latest_img, (x1, y1), (x2, y2), color, 3)
+                cv2.rectangle(latest_img, (x1, y1), (x2, y2), color, 2)
                 label = f"{classNames[cls]} {conf}"
-                cv2.putText(latest_img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+                cv2.putText(latest_img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
                 
                 # 打印日志
                 print(f"Class name --> {classNames[cls]}, Confidence ---> {conf}")
 
-            # 如果没有检测到指定类别的物体，则不显示任何框
+            # 如果没有检测到指定类别的物体，则通知用户手动选择框
             if len(boxes_info) == 0:
                 print("当前帧没有检测到指定类别的物体。您可以手动拖拽选择一个框来初始化跟踪。")
             else:
@@ -263,15 +271,21 @@ if __name__ == "__main__":
         frame_idx += 1
         if track_initialized and show_masks:
             mask = tracker.forward(frame)
-            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+            # 假设 mask 是一个二进制掩码
+            if isinstance(mask, torch.Tensor):
+                mask = mask.cpu().numpy()
+            # 确保掩码是二进制的
+            mask = (mask > 0).astype(np.uint8)
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             cnt_area = [cv2.contourArea(cnt) for cnt in contours]
 
             if len(contours) != 0 and np.max(cnt_area) > 100:
                 contour = contours[np.argmax(cnt_area)]  # 使用最大面积的轮廓
                 polygon = contour.reshape(-1, 2)
-                # 将掩码颜色改为绿色
-                frame[:, :, 1] = (mask > 0) * 255 + (mask == 0) * frame[:, :, 1]  # 绿色通道
-                frame = cv2.polylines(frame, [polygon], True, (0, 255, 0), 3)
+                # 应用绿色掩码
+                frame[:, :, 1] = (mask * 255).astype(np.uint8) + (mask == 0) * frame[:, :, 1]
+                # 绘制绿色多边形轮廓
+                cv2.polylines(frame, [polygon], True, (0, 255, 0), 2)
             else:
                 print(f"跟踪失败，未能在第{frame_idx}帧中找到目标。")
                 cv2.putText(
@@ -283,19 +297,18 @@ if __name__ == "__main__":
                     (0, 0, 255),
                     2
                 )
-                # 从现在开始不再显示掩码
+                # 从这帧开始不再显示掩码
                 tracking_failed = True
                 show_masks = False
-        else:
-            # 未初始化跟踪或跟踪失败，显示原始帧
-            pass
 
-        # 显示和保存结果帧
-        # 缩放用于显示
-        frame_resized = cv2.resize(frame, (width_resized, height_resized))
-        cv2.imshow('Video', frame_resized)
+        # 写入帧到输出视频
         output_writer.write(frame)
         
+        # 显示缩放后的帧
+        frame_resized = cv2.resize(frame, (width_resized, height_resized))
+        cv2.imshow('Video', frame_resized)
+        
+        # 处理按键事件
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
             print("用户选择退出。")
