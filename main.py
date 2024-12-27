@@ -6,14 +6,14 @@ import argparse
 from models.siammask import SiamMask
 import torch
 
-# Global variables for drawing
-drawing = False  # True if mouse is pressed
+# 全局变量用于绘制
+drawing = False  # 如果鼠标被按下，则为 True
 ix, iy = -1, -1
-selected_box_manual = None  # Manually selected box
+selected_box_manual = None  # 手动选择的框
 
 def calculate_bounding_box(mask):
     """
-    Calculate the bounding box coordinates from the mask.
+    从掩码计算边界框坐标。
     """
     pos = np.where(mask)
     if len(pos[0]) == 0 or len(pos[1]) == 0:
@@ -25,26 +25,26 @@ def calculate_bounding_box(mask):
     return x_min, y_min, x_max, y_max
 
 def click_event(event, x, y, flags, param):
-    global selected_box, boxes_info, latest_img, track_initialized, drawing, ix, iy, selected_box_manual, frame_display, tracking_failed
+    global selected_box, boxes_info, latest_img, track_initialized, drawing, ix, iy, selected_box_manual, frame_display, tracking_failed, show_masks
     detect_model = param['detect_model']
     classNames = param['classNames']
     tracker = param['tracker']
     output_writer = param['output_writer']
     scale_factor = param['scale_factor']
-
+    
     if tracking_failed:
-        # Tracking has failed; no further interaction required
+        # 跟踪已失败，不再处理点击事件
         return
 
     if event == cv2.EVENT_LBUTTONDOWN and not track_initialized:
         if len(boxes_info) > 0:
-            # Check if click is inside any detection box
+            # 检查点击是否在任何检测框内
             min_area = float('inf')
             selected_box_candidate = None
             for info in boxes_info:
                 box = info['box']
                 x1, y1, x2, y2 = box
-                # Scale the box coordinates to the display size
+                # 将框坐标缩放到显示尺寸
                 x1_disp, y1_disp, x2_disp, y2_disp = [int(coord * scale_factor) for coord in box]
                 if x1_disp < x < x2_disp and y1_disp < y < y2_disp:
                     area = (x2_disp - x1_disp) * (y2_disp - y1_disp)
@@ -52,40 +52,47 @@ def click_event(event, x, y, flags, param):
                         min_area = area
                         selected_box_candidate = box
             if selected_box_candidate is not None:
-                # Initialize tracker with selected detection box
+                # 使用选中的检测框初始化跟踪器
                 x, y, w, h = selected_box_candidate[0], selected_box_candidate[1], selected_box_candidate[2] - selected_box_candidate[0], selected_box_candidate[3] - selected_box_candidate[1]
-                print("Tracker Model set initialization with selected box")
-                print(x, y, w, h)
+                print("使用选中的检测框初始化跟踪器")
+                print(f"框坐标: x={x}, y={y}, w={w}, h={h}")
                 tracker.init(latest_img, (x, y, w, h))
                 selected_box = selected_box_candidate
                 track_initialized = True
-                print("Tracking initialized with selected bounding box.")
-                return  # Exit after initializing
+                show_masks = True
+                print("跟踪器已初始化")
+                return  # 初始化完成，退出事件处理
 
-        # If click is outside any detection box, start drawing manually
+        # 如果点击在任何检测框外，开始手动绘制框
         drawing = True
         ix, iy = x, y
 
     elif event == cv2.EVENT_MOUSEMOVE:
         if drawing:
-            # Update the rectangle being drawn
+            # 更新正在绘制的矩形框
             frame_display[:] = latest_img_resized.copy()
-            cv2.rectangle(frame_display, (ix, iy), (x, y), (255, 0, 0), 2)
+            cv2.rectangle(frame_display, (ix, iy), (x, y), (255, 0, 0), 2)  # 蓝色矩形框
             cv2.imshow('Video', frame_display)
 
     elif event == cv2.EVENT_LBUTTONUP:
         if drawing:
             drawing = False
-            selected_box_manual = (min(ix, x) / scale_factor, min(iy, y) / scale_factor, max(ix, x) / scale_factor, max(iy, y) / scale_factor)
-            print(f"Manual selection box: {selected_box_manual}")
-            # Initialize tracker with manually drawn box
-            x1, y1, x2, y2 = selected_box_manual
-            w = x2 - x1
-            h = y2 - y1
-            tracker.init(latest_img, (x1, y1, w, h))
+            # 将坐标缩放回原始图像尺寸
+            x1 = min(ix, x) / scale_factor
+            y1 = min(iy, y) / scale_factor
+            x2 = max(ix, x) / scale_factor
+            y2 = max(iy, y) / scale_factor
+            selected_box_manual = (x1, y1, x2, y2)
+            print(f"手动选择的框: {selected_box_manual}")
+            # 使用手动绘制的框初始化跟踪器
+            x1_orig, y1_orig, x2_orig, y2_orig = selected_box_manual
+            w = x2_orig - x1_orig
+            h = y2_orig - y1_orig
+            tracker.init(latest_img, (x1_orig, y1_orig, w, h))
             selected_box = selected_box_manual
             track_initialized = True
-            print("Tracking initialized with manually selected bounding box.")
+            show_masks = True
+            print("使用手动选择的框初始化跟踪器")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -142,7 +149,7 @@ if __name__ == "__main__":
         boxes_info.append({'box': (x1, y1, x2, y2), 'conf': conf, 'cls': cls})
         
         # 设置颜色和文本
-        color = (0, 255, 0)
+        color = (0, 255, 0)  # 绿色
         cv2.rectangle(latest_img, (x1, y1), (x2, y2), color, 3)
         label = f"{classNames[cls]} {conf}"
         cv2.putText(latest_img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
@@ -157,16 +164,19 @@ if __name__ == "__main__":
         print("显示第一帧，请点击选择要跟踪的物体。")
     
     # Resize factor
-    scale_factor = 0.5  # Resize to half
+    scale_factor = 0.5  # 缩放为原始尺寸的二分之一
     width_resized = int(width * scale_factor)
     height_resized = int(height * scale_factor)
     
-    # Resize the image for display
+    # 缩放图像用于显示
     latest_img_resized = cv2.resize(latest_img, (width_resized, height_resized))
     frame_display = latest_img_resized.copy()
 
-    # 初始化跟踪失败标志
+    # 标志位
+    selected_box = None  # 存储选中框的坐标
+    track_initialized = False
     tracking_failed = False
+    show_masks = True
 
     # 显示第一帧并等待用户交互
     cv2.namedWindow("Video", cv2.WINDOW_AUTOSIZE)
@@ -181,9 +191,6 @@ if __name__ == "__main__":
     }
     cv2.setMouseCallback("Video", click_event, params)
     
-    selected_box = None  # 存储选中框的坐标
-    track_initialized = False
-
     print("显示第一帧，请点击选择要跟踪的物体。")
     
     while True:
@@ -200,6 +207,8 @@ if __name__ == "__main__":
         elif key == ord('r'):
             selected_box = None  # 重置选中的框
             track_initialized = False
+            tracking_failed = False
+            show_masks = True
             # 重新显示第一帧
             latest_img = first_frame.copy()
             # 重新进行YOLO检测
@@ -215,7 +224,7 @@ if __name__ == "__main__":
                 boxes_info.append({'box': (x1, y1, x2, y2), 'conf': conf, 'cls': cls})
                 
                 # 设置颜色和文本
-                color = (0, 255, 0)
+                color = (0, 255, 0)  # 绿色
                 cv2.rectangle(latest_img, (x1, y1), (x2, y2), color, 3)
                 label = f"{classNames[cls]} {conf}"
                 cv2.putText(latest_img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
@@ -229,7 +238,7 @@ if __name__ == "__main__":
             else:
                 print("重新显示第一帧，请点击选择要跟踪的物体。")
             
-            # Resize for display
+            # 缩放用于显示
             latest_img_resized = cv2.resize(latest_img, (width_resized, height_resized))
             frame_display = latest_img_resized.copy()
             cv2.imshow('Video', frame_display)
@@ -240,7 +249,7 @@ if __name__ == "__main__":
 
     # 初始化输出视频写入器
     output_writer.write(first_frame)
-
+    
     # 开始跟踪
     frame_idx = 1  # 已处理第一帧
     print("开始跟踪视频...")
@@ -252,43 +261,48 @@ if __name__ == "__main__":
             break
         
         frame_idx += 1
+        if track_initialized and show_masks:
+            mask = tracker.forward(frame)
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+            cnt_area = [cv2.contourArea(cnt) for cnt in contours]
 
-        if not tracking_failed:
-            try:
-                mask = tracker.forward(frame)
-                contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-                cnt_area = [cv2.contourArea(cnt) for cnt in contours]
-
-                if len(contours) != 0 and np.max(cnt_area) > 100:
-                    contour = contours[np.argmax(cnt_area)]  # 使用最大面积的轮廓
-                    polygon = contour.reshape(-1, 2)
-                    frame[:, :, 2] = (mask > 0) * 255 + (mask == 0) * frame[:, :, 2]
-                    frame = cv2.polylines(frame, [polygon], True, (0,0,255), 3)
-                else:
-                    raise ValueError("Tracking failed.")
-
-            except Exception as e:
+            if len(contours) != 0 and np.max(cnt_area) > 100:
+                contour = contours[np.argmax(cnt_area)]  # 使用最大面积的轮廓
+                polygon = contour.reshape(-1, 2)
+                # 将掩码颜色改为绿色
+                frame[:, :, 1] = (mask > 0) * 255 + (mask == 0) * frame[:, :, 1]  # 绿色通道
+                frame = cv2.polylines(frame, [polygon], True, (0, 255, 0), 3)
+            else:
                 print(f"跟踪失败，未能在第{frame_idx}帧中找到目标。")
+                cv2.putText(
+                    frame,
+                    f"Tracking failed at frame {frame_idx}",
+                    (50, 50),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1,
+                    (0, 0, 255),
+                    2
+                )
+                # 从现在开始不再显示掩码
                 tracking_failed = True
-                print("从此帧开始，后续帧将不再应用跟踪。")
-                # Optionally, you can display the original frame without any annotations
+                show_masks = False
+        else:
+            # 未初始化跟踪或跟踪失败，显示原始帧
+            pass
 
         # 显示和保存结果帧
-        if tracking_failed:
-            # Resize for display
-            frame_resized = cv2.resize(frame, (width_resized, height_resized))
-            cv2.imshow('Video', frame_resized)
-        else:
-            # Resize for display with tracking annotations
-            frame_resized = cv2.resize(frame, (width_resized, height_resized))
-            cv2.imshow('Video', frame_resized)
-        
+        # 缩放用于显示
+        frame_resized = cv2.resize(frame, (width_resized, height_resized))
+        cv2.imshow('Video', frame_resized)
         output_writer.write(frame)
         
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
             print("用户选择退出。")
             break
+        elif key == ord('k'):
+            print("用户按下 'k'，停止显示跟踪掩码。")
+            show_masks = False
 
     # 释放资源
     video_cap.release()
