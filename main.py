@@ -25,14 +25,14 @@ def calculate_bounding_box(mask):
     return x_min, y_min, x_max, y_max
 
 def click_event(event, x, y, flags, param):
-    global selected_box, boxes_info, latest_img, track_initialized, drawing, ix, iy, selected_box_manual
+    global selected_box, boxes_info, latest_img, track_initialized, drawing, ix, iy, selected_box_manual, frame_display
     detect_model = param['detect_model']
     classNames = param['classNames']
     tracker = param['tracker']
     output_writer = param['output_writer']
-    frame_display = param['frame_display']
+    scale_factor = param['scale_factor']
 
-    if event == cv2.EVENT_LBUTTONDOWN:
+    if event == cv2.EVENT_LBUTTONDOWN and not track_initialized:
         if len(boxes_info) > 0:
             # Check if click is inside any detection box
             min_area = float('inf')
@@ -40,8 +40,10 @@ def click_event(event, x, y, flags, param):
             for info in boxes_info:
                 box = info['box']
                 x1, y1, x2, y2 = box
-                if x1 < x < x2 and y1 < y < y2:
-                    area = (x2 - x1) * (y2 - y1)
+                # Scale the box coordinates to the display size
+                x1_disp, y1_disp, x2_disp, y2_disp = [int(coord * scale_factor) for coord in box]
+                if x1_disp < x < x2_disp and y1_disp < y < y2_disp:
+                    area = (x2_disp - x1_disp) * (y2_disp - y1_disp)
                     if area < min_area:
                         min_area = area
                         selected_box_candidate = box
@@ -55,22 +57,22 @@ def click_event(event, x, y, flags, param):
                 track_initialized = True
                 print("Tracking initialized with selected bounding box.")
                 return  # Exit after initializing
-        else:
-            # No detection boxes, start drawing manually
-            drawing = True
-            ix, iy = x, y
+
+        # If click is outside any detection box, start drawing manually
+        drawing = True
+        ix, iy = x, y
 
     elif event == cv2.EVENT_MOUSEMOVE:
         if drawing:
             # Update the rectangle being drawn
-            frame_display[:] = latest_img.copy()
+            frame_display[:] = latest_img_resized.copy()
             cv2.rectangle(frame_display, (ix, iy), (x, y), (255, 0, 0), 2)
             cv2.imshow('Video', frame_display)
 
     elif event == cv2.EVENT_LBUTTONUP:
         if drawing:
             drawing = False
-            selected_box_manual = (min(ix, x), min(iy, y), max(ix, x), max(iy, y))
+            selected_box_manual = (min(ix, x) / scale_factor, min(iy, y) / scale_factor, max(ix, x) / scale_factor, max(iy, y) / scale_factor)
             print(f"Manual selection box: {selected_box_manual}")
             # Initialize tracker with manually drawn box
             x1, y1, x2, y2 = selected_box_manual
@@ -122,8 +124,7 @@ if __name__ == "__main__":
         exit(1)
     
     latest_img = first_frame.copy()
-    frame_display = latest_img.copy()
-
+    
     # 进行YOLO检测
     results = detect_model.predict(latest_img)
     boxes = results[0].boxes  # 获取检测结果
@@ -147,15 +148,21 @@ if __name__ == "__main__":
 
     # 如果没有检测到指定类别的物体，则不显示任何框
     if len(boxes_info) == 0:
-        latest_img = first_frame.copy()
-        frame_display = latest_img.copy()
         print("当前帧没有检测到指定类别的物体。您可以手动拖拽选择一个框来初始化跟踪。")
     else:
-        frame_display = latest_img.copy()
         print("显示第一帧，请点击选择要跟踪的物体。")
+    
+    # Resize factor
+    scale_factor = 0.5  # Resize to half
+    width_resized = int(width * scale_factor)
+    height_resized = int(height * scale_factor)
+    
+    # Resize the image for display
+    latest_img_resized = cv2.resize(latest_img, (width_resized, height_resized))
+    frame_display = latest_img_resized.copy()
 
     # 显示第一帧并等待用户交互
-    cv2.namedWindow("Video", cv2.WINDOW_NORMAL)
+    cv2.namedWindow("Video", cv2.WINDOW_AUTOSIZE)
     
     # 创建包含所需变量的字典
     params = {
@@ -163,7 +170,7 @@ if __name__ == "__main__":
         'classNames': classNames,
         'tracker': tracker,
         'output_writer': output_writer,
-        'frame_display': frame_display,
+        'scale_factor': scale_factor,
     }
     cv2.setMouseCallback("Video", click_event, params)
     
@@ -188,16 +195,36 @@ if __name__ == "__main__":
             track_initialized = False
             # 重新显示第一帧
             latest_img = first_frame.copy()
-            if len(boxes_info) > 0:
-                for info in boxes_info:
-                    x1, y1, x2, y2 = info['box']
-                    conf = info['conf']
-                    cls = info['cls']
-                    color = (0, 255, 0)
-                    cv2.rectangle(latest_img, (x1, y1), (x2, y2), color, 3)
-                    label = f"{classNames[cls]} {conf}"
-                    cv2.putText(latest_img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
-            frame_display = latest_img.copy()
+            # 重新进行YOLO检测
+            results = detect_model.predict(latest_img)
+            boxes = results[0].boxes  # 获取检测结果
+            boxes_info = []  # 用于存储框的信息
+
+            for box in boxes:
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                conf = math.ceil((box.conf[0]*100))/100
+                cls = int(box.cls[0])
+                # 存储每个框的信息
+                boxes_info.append({'box': (x1, y1, x2, y2), 'conf': conf, 'cls': cls})
+                
+                # 设置颜色和文本
+                color = (0, 255, 0)
+                cv2.rectangle(latest_img, (x1, y1), (x2, y2), color, 3)
+                label = f"{classNames[cls]} {conf}"
+                cv2.putText(latest_img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+                
+                # 打印日志
+                print(f"Class name --> {classNames[cls]}, Confidence ---> {conf}")
+
+            # 如果没有检测到指定类别的物体，则不显示任何框
+            if len(boxes_info) == 0:
+                print("当前帧没有检测到指定类别的物体。您可以手动拖拽选择一个框来初始化跟踪。")
+            else:
+                print("重新显示第一帧，请点击选择要跟踪的物体。")
+            
+            # Resize for display
+            latest_img_resized = cv2.resize(latest_img, (width_resized, height_resized))
+            frame_display = latest_img_resized.copy()
             cv2.imshow('Video', frame_display)
             if len(boxes_info) > 0:
                 print("已重置，请再次点击选择要跟踪的物体。")
@@ -240,7 +267,9 @@ if __name__ == "__main__":
             )
         
         # 显示和保存结果帧
-        cv2.imshow('Video', frame)
+        # Resize for display
+        frame_resized = cv2.resize(frame, (width_resized, height_resized))
+        cv2.imshow('Video', frame_resized)
         output_writer.write(frame)
         
         key = cv2.waitKey(1) & 0xFF

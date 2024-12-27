@@ -1,7 +1,4 @@
 # SB-Tracker (Offline version)
-
-开放环境下基于人机交互的UAV Tracker，部署在Jetson Orin板载上(以NX为例)，会先用yolo-world给用户检测物体类别（基于CLIP的开集检测，类别可以自己给），然后用户用鼠标点击要跟踪的物体，可以即刻跟踪物体。由于同时加载了端侧的Segment Anything模型，用户既可以点击指定类别框内的物体，也可以临时点击视野内没有标记检测框的任意物体，都可以尝试进行跟踪，`r`为重置，`q`为退出。
-
 当前这个版本主要是用给定的mp4视频对指定的一个气球做跟踪，笔记本算力负载，出一个能持续tracking的demo
 
 ## 在笔记本电脑上测试
@@ -34,14 +31,7 @@ docker exec -it sbtracker-train /bin/bash
 ```sh
 cd /workspace/SiamMask/ && python3 export.py
 ```
-开始部署服务器侧优化的ViT算法 (调试需要`--verbose`,xl1和l2模型的性价比详见[韩松团队介绍](https://github.com/mit-han-lab/efficientvit/tree/master/applications/efficientvit_sam))
-```sh
-cd /workspace/efficientvit && \
-trtexec --onnx=assets/export_models/efficientvit_sam/onnx/efficientvit_sam_xl1_encoder.onnx --minShapes=input_image:1x3x1024x1024 --optShapes=input_image:4x3x1024x1024 --maxShapes=input_image:4x3x1024x1024 --saveEngine=assets/export_models/efficientvit_sam/tensorrt/efficientvit_sam_xl1_encoder.engine && \
-trtexec --onnx=assets/export_models/efficientvit_sam/onnx/efficientvit_sam_xl1_decoder.onnx --minShapes=point_coords:1x1x2,point_labels:1x1 --optShapes=point_coords:16x2x2,point_labels:16x2 --maxShapes=point_coords:16x2x2,point_labels:16x2 --fp16 --saveEngine=assets/export_models/efficientvit_sam/tensorrt/efficientvit_sam_xl1_decoder.engine && \
-python3 applications/efficientvit_sam/run_efficientvit_sam_trt.py --model efficientvit-sam-xl1 --encoder_engine assets/export_models/efficientvit_sam/tensorrt/efficientvit_sam_xl1_encoder.engine --decoder_engine assets/export_models/efficientvit_sam/tensorrt/efficientvit_sam_xl1_decoder.engine --mode point
-```
-尝试运行服务器的开放物体检测跟踪代码
+尝试运行服务器的开放物体检测跟踪代码，如果没有显示相应的框、就需要自己拖拽鼠标框出
 ```sh
 cd /workspace && git clone -b offline https://github.com/superboySB/SB-Tracker && cd SB-Tracker
 
