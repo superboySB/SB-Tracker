@@ -25,12 +25,16 @@ def calculate_bounding_box(mask):
     return x_min, y_min, x_max, y_max
 
 def click_event(event, x, y, flags, param):
-    global selected_box, boxes_info, latest_img, track_initialized, drawing, ix, iy, selected_box_manual, frame_display
+    global selected_box, boxes_info, latest_img, track_initialized, drawing, ix, iy, selected_box_manual, frame_display, tracking_failed
     detect_model = param['detect_model']
     classNames = param['classNames']
     tracker = param['tracker']
     output_writer = param['output_writer']
     scale_factor = param['scale_factor']
+
+    if tracking_failed:
+        # Tracking has failed; no further interaction required
+        return
 
     if event == cv2.EVENT_LBUTTONDOWN and not track_initialized:
         if len(boxes_info) > 0:
@@ -100,7 +104,7 @@ if __name__ == "__main__":
     detect_model.set_classes(classNames)
 
     # 打开视频文件
-    video_path = "/workspace/SB-Tracker/data/ballon1.mp4"
+    video_path = "/workspace/SB-Tracker/data/ballon3.mp4"
     video_cap = cv2.VideoCapture(video_path)
     if not video_cap.isOpened():
         print(f"无法打开视频文件: {video_path}")
@@ -160,6 +164,9 @@ if __name__ == "__main__":
     # Resize the image for display
     latest_img_resized = cv2.resize(latest_img, (width_resized, height_resized))
     frame_display = latest_img_resized.copy()
+
+    # 初始化跟踪失败标志
+    tracking_failed = False
 
     # 显示第一帧并等待用户交互
     cv2.namedWindow("Video", cv2.WINDOW_AUTOSIZE)
@@ -230,10 +237,10 @@ if __name__ == "__main__":
                 print("已重置，请再次点击选择要跟踪的物体。")
             else:
                 print("已重置，请手动拖拽选择要跟踪的物体。")
-    
+
     # 初始化输出视频写入器
     output_writer.write(first_frame)
-    
+
     # 开始跟踪
     frame_idx = 1  # 已处理第一帧
     print("开始跟踪视频...")
@@ -245,31 +252,37 @@ if __name__ == "__main__":
             break
         
         frame_idx += 1
-        mask = tracker.forward(frame)
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-        cnt_area = [cv2.contourArea(cnt) for cnt in contours]
 
-        if len(contours) != 0 and np.max(cnt_area) > 100:
-            contour = contours[np.argmax(cnt_area)]  # 使用最大面积的轮廓
-            polygon = contour.reshape(-1, 2)
-            frame[:, :, 2] = (mask > 0) * 255 + (mask == 0) * frame[:, :, 2]
-            frame = cv2.polylines(frame, [polygon], True, (0,0,255), 3)
-        else:
-            print(f"跟踪失败，未能在第{frame_idx}帧中找到目标。")
-            cv2.putText(
-                frame,
-                f"Tracking failed at frame {frame_idx}",
-                (50, 50),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (0, 0, 255),
-                2
-            )
-        
+        if not tracking_failed:
+            try:
+                mask = tracker.forward(frame)
+                contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+                cnt_area = [cv2.contourArea(cnt) for cnt in contours]
+
+                if len(contours) != 0 and np.max(cnt_area) > 100:
+                    contour = contours[np.argmax(cnt_area)]  # 使用最大面积的轮廓
+                    polygon = contour.reshape(-1, 2)
+                    frame[:, :, 2] = (mask > 0) * 255 + (mask == 0) * frame[:, :, 2]
+                    frame = cv2.polylines(frame, [polygon], True, (0,0,255), 3)
+                else:
+                    raise ValueError("Tracking failed.")
+
+            except Exception as e:
+                print(f"跟踪失败，未能在第{frame_idx}帧中找到目标。")
+                tracking_failed = True
+                print("从此帧开始，后续帧将不再应用跟踪。")
+                # Optionally, you can display the original frame without any annotations
+
         # 显示和保存结果帧
-        # Resize for display
-        frame_resized = cv2.resize(frame, (width_resized, height_resized))
-        cv2.imshow('Video', frame_resized)
+        if tracking_failed:
+            # Resize for display
+            frame_resized = cv2.resize(frame, (width_resized, height_resized))
+            cv2.imshow('Video', frame_resized)
+        else:
+            # Resize for display with tracking annotations
+            frame_resized = cv2.resize(frame, (width_resized, height_resized))
+            cv2.imshow('Video', frame_resized)
+        
         output_writer.write(frame)
         
         key = cv2.waitKey(1) & 0xFF
