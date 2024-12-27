@@ -43,9 +43,9 @@ python3 applications/efficientvit_sam/run_efficientvit_sam_trt.py --model effici
 ```
 尝试运行服务器的开放物体检测跟踪代码
 ```sh
-cd /workspace && git clone -b realsense https://github.com/superboySB/SB-Tracker && cd SB-Tracker
+cd /workspace && git clone -b offline https://github.com/superboySB/SB-Tracker && cd SB-Tracker
 
-python3 main.py --use_tensorrt --yolo_model_type=v8l --sam_model_type=xl1 --class_names="blue bottle, white cup"
+python3 main.py --use_tensorrt --yolo_model_type=v8l --sam_model_type=xl1 --class_names="red balloon, red ball"
 ```
 这里包含一个开集检测器，可以自己定义感兴趣的类别`--class_names`
 
